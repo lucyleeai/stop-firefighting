@@ -1,0 +1,23 @@
+{
+  "name": "stop-firefighting",
+  "displayName": "Stop Firefighting",
+  "version": "0.1.0",
+  "description": "Evidence-first problem solving adapted from Lean Six Sigma: see where time really goes in a process, and learn from mistakes without blaming people. Every number comes from a bundled script; every method cites a public source.",
+  "author": {
+    "name": "Lucy Lee"
+  },
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "lean",
+    "six-sigma",
+    "dmaic",
+    "process-improvement",
+    "human-factors",
+    "root-cause",
+    "small-business",
+    "operations",
+    "procurement"
+  ],
+  "homepage": "https://github.com/lucyleeai/stop-firefighting",
+  "repository": "https://github.com/lucyleeai/stop-firefighting"
+}
