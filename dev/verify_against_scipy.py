@@ -126,6 +126,76 @@ for _ in range(200):
     same(cap["Cpk"], min(usl - mu, mu - lsl) / (3 * sw), 1e-3, "Cpk")
     same(cap["Ppk"], min(usl - mu, mu - lsl) / (3 * so), 1e-3, "Ppk")
 
+# rater agreement against statsmodels
+from statsmodels.stats.inter_rater import cohens_kappa, fleiss_kappa, aggregate_raters
+for _ in range(200):
+    cats = "abc"[:rng.randint(2, 3)]
+    n = rng.randint(10, 80)
+    a = [rng.choice(cats) for _ in range(n)]
+    b = [x if rng.random() < 0.7 else rng.choice(cats) for x in a]
+    if len(set(a + b)) < 2:
+        continue
+    ours = st.agreement({str(i): {"r1": x, "r2": y} for i, (x, y) in enumerate(zip(a, b))})
+    allc = sorted(set(a + b))
+    tab = np.array([[sum(1 for x, y in zip(a, b) if x == c1 and y == c2) for c2 in allc] for c1 in allc])
+    same(ours["kappa"], cohens_kappa(tab).kappa, 1e-4, "Cohen kappa")
+    m = rng.randint(3, 5)
+    rat = [[x if rng.random() < 0.7 else rng.choice(cats) for _ in range(m)] for x in a]
+    ours = st.agreement({str(i): {f"r{j}": v for j, v in enumerate(row)} for i, row in enumerate(rat)})
+    agg, _ = aggregate_raters(np.array([[allc_i for allc_i in row] for row in rat]))
+    same(ours["kappa"], fleiss_kappa(agg), 1e-4, "Fleiss kappa")
+
+# gauge study ANOVA against statsmodels two-way ANOVA
+import pandas as pd
+import statsmodels.formula.api as smf
+from statsmodels.stats.anova import anova_lm
+for _ in range(60):
+    p_, o_, r_ = rng.randint(3, 10), rng.randint(2, 4), rng.randint(2, 3)
+    rows = []
+    for i in range(p_):
+        pv = rng.gauss(0, 3)
+        for j in range(o_):
+            ov = rng.gauss(0, 0.5)
+            for _k in range(r_):
+                rows.append({"part": f"p{i}", "operator": f"o{j}", "value": pv + ov + rng.gauss(0, 0.4)})
+    ours = st.gauge_rr(rows)
+    df_ = pd.DataFrame(rows)
+    al = anova_lm(smf.ols("value ~ C(part) * C(operator)", data=df_).fit(), typ=2)
+    pi = al.loc["C(part):C(operator)", "PR(>F)"]
+    same(ours["interaction_p"], pi, 1e-4, "GRR interaction p")
+    mse = al.loc["Residual", "sum_sq"] / al.loc["Residual", "df"]
+    msi = al.loc["C(part):C(operator)", "sum_sq"] / al.loc["C(part):C(operator)", "df"]
+    mso = al.loc["C(operator)", "sum_sq"] / al.loc["C(operator)", "df"]
+    msp = al.loc["C(part)", "sum_sq"] / al.loc["C(part)", "df"]
+    if pi > 0.25:
+        mse = (al.loc["C(part):C(operator)", "sum_sq"] + al.loc["Residual", "sum_sq"]) / (al.loc["C(part):C(operator)", "df"] + al.loc["Residual", "df"])
+        vint, den = 0.0, mse
+    else:
+        vint, den = max(0, (msi - mse) / r_), msi
+    vop, vpart = max(0, (mso - den) / (p_ * r_)), max(0, (msp - den) / (o_ * r_))
+    vg = mse + vop + vint
+    same(ours["pct_study_var"]["total_gauge"], math.sqrt(vg / (vg + vpart)) * 100, 0.06, "GRR %study var")
+
+# two-level factorial against OLS
+import itertools
+for _ in range(60):
+    k = rng.randint(2, 4); reps = rng.choice([1, 2, 3])
+    des = st.doe_design(k, reps, seed=rng.randint(1, 999))["design"]
+    coef = {t: rng.uniform(-3, 3) for t in itertools.chain.from_iterable(itertools.combinations(range(k), m) for m in range(1, k + 1))}
+    rows = []
+    for d in des:
+        lv = [d[f"F{j + 1}"] for j in range(k)]
+        yv = 20 + sum(c * math.prod(lv[j] for j in t) for t, c in coef.items()) + rng.gauss(0, 1)
+        rows.append({**{f"F{j + 1}": str(lv[j]) for j in range(k)}, "y": str(yv)})
+    fac = [f"F{j + 1}" for j in range(k)]
+    ours = st.doe_analyze(rows, fac, "y")
+    df_ = pd.DataFrame([{**{f: float(r_[f]) for f in fac}, "y": float(r_["y"])} for r_ in rows])
+    fit = smf.ols("y ~ " + "*".join(fac), data=df_).fit()
+    for t, e in ours["effects"].items():
+        same(e, 2 * fit.params[t], 1e-3, "DOE effect")
+        if reps > 1:
+            same(ours["significance"][t]["p"], fit.pvalues[t], 1e-3, "DOE effect p")
+
 # control-chart constants against first principles
 d2 = 2 / math.sqrt(math.pi)  # expected range of 2 normal values in sd units = 1.128
 same(1.128, d2, 5e-4, "d2 constant")

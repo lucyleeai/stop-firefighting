@@ -15,7 +15,13 @@
 For the new way of working, list in a short table:
 | What could go wrong | Effect | How we would notice | What we do then |
 |---|---|---|---|
-Look especially at: new waiting or work for someone else, a check that gets skipped because the new step feels like enough, people working around it, a wrong standard made permanent. A long scoring exercise is not needed; the list and the "how we would notice" column are.
+Look especially at: new waiting or work for someone else, a check that gets skipped because the new step feels like enough, people working around it, a wrong standard made permanent.
+
+**Which risks to act on first — severity first, not a multiplied score.** Rate each effect as serious (harm, legal, money lost, a customer lost), noticeable, or minor; and how likely and how early you would notice it.
+1. Any **serious** effect needs an action before going live — prevent it, or make it obvious at once — however unlikely it seems.
+2. Then effects that are **likely and noticed late**.
+3. Then the rest, if cheap.
+Do not multiply 1–10 ratings into one "risk number": very different risks get the same number, and a serious effect can hide behind a low product.
 
 ## Stop rule and way back
 - Stop when: the bar is clearly missed, a listed side effect appears, or it needs authority nobody granted.

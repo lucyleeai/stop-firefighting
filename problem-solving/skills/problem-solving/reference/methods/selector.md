@@ -130,7 +130,8 @@ start with the first two.
 **Before trusting any chart, check the measurement.** If two people measuring
 the same item get different results, or the gauge cannot tell good from bad,
 the variation you see may be the measurement, not the process (measurement
-system analysis: bias, repeatability, reproducibility, resolution). Status: guided.
+system analysis: bias, repeatability, reproducibility, resolution). Judgements:
+`stats_tools.py agree`; measured values: `stats_tools.py grr` (`cards/measurement-check.md`). Status: run.
 
 ## F. How much data?
 
@@ -150,7 +151,7 @@ Script: `stats_tools.py size mean --sd --margin` · `size proportion --p --margi
 | Situation | Method | Status |
 |---|---|---|
 | One or two candidate fixes, easy to reverse | Trial with before/after measurement on the same basis | guided (flow: run) |
-| Several factors may matter; you can set them | Designed experiment: screening (fractional factorial) first, then full factorial on the few that matter | elsewhere / later |
+| Several factors may matter; you can set them | Designed experiment: screening (fractional factorial) first, then full factorial on the few that matter — up to 5 factors: `doe design` / `doe analyze` (`cards/experiment.md`); more: a specialist | run |
 | Changing one factor at a time | Avoid when factors interact — it misses interactions and gives no prediction | — |
 | "It worked, but only at one exact setting" | Look for a robust setting (performance *and* its variation), not a spike | elsewhere |
 | Choosing among options with several criteria | Decision matrix against a baseline; show the scoring evidence and whether the winner changes when weights change | guided |

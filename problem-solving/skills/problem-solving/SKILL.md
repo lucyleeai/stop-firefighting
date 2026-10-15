@@ -87,7 +87,7 @@ not state statistics you have not computed.
    place where something can be changed, with the evidence for and against,
    and a check that would tell the candidates apart. "Didn't understand", "be
    more careful" and "communicate better" are not causes.
-4. **A small trial** (`reference/methods/cards/trial-and-risk.md`, `reference/methods/cards/benefit-baseline.md`). The change, the success bar and check date set before it
+4. **A small trial** (`reference/methods/cards/trial-and-risk.md`, `reference/methods/cards/benefit-baseline.md`; several factors at once: `reference/methods/cards/experiment.md`). The change, the success bar and check date set before it
    starts (propose defaults if the user gives none), side effects to watch,
    and how to undo or remedy it.
 5. **Into the real work.** Evidence that the change is in place and used by

@@ -15,6 +15,9 @@ reports comes from here, never from the model's own arithmetic.
             --rules picks any of Nelson rules 1-8 (default 1,2)
   capability  process capability against a requirement (refuses an unstable process)
   regress   correlation (Pearson with interval, Spearman) and a least-squares line
+  agree     do raters agree? Cohen's / Fleiss' kappa, % agreement, and accuracy vs a reference rater
+  grr       gauge study for measured values (repeatability, reproducibility, % of study variation)
+  doe       two-level full factorial: design a randomised run sheet, or analyse the results
   size      sample size: estimate a mean or proportion, or detect a difference in proportions
   selftest  run the built-in checks
 
@@ -628,6 +631,204 @@ def regress(xs, ys):
     return out
 
 
+# ---------- agreement between raters (attribute measurement check) ----------
+
+def agreement(table, standard=None):
+    """table: {item: {rater: category}}; standard: {item: category} or None."""
+    items = [i for i in table if len(table[i]) >= 2]
+    if len(items) < 5:
+        fail("need at least 5 items rated by 2 or more raters")
+    raters = sorted({rt for i in items for rt in table[i]})
+    cats = sorted({c for i in items for c in table[i].values()} | (set(standard.values()) if standard else set()))
+    out = {"status": "ok", "items": len(items), "raters": raters, "categories": cats}
+    if len(raters) == 2 and all(len(table[i]) == 2 for i in items):
+        a, b = raters
+        agree = sum(1 for i in items if table[i][a] == table[i][b])
+        po = agree / len(items)
+        pe = sum((sum(1 for i in items if table[i][a] == c) / len(items)) *
+                 (sum(1 for i in items if table[i][b] == c) / len(items)) for c in cats)
+        kappa = (po - pe) / (1 - pe) if pe < 1 else 1.0
+        lo, hi = wilson(agree, len(items))
+        out.update({"method": "Cohen's kappa (2 raters)", "percent_agreement": r(po * 100, 1),
+                    "ci_95_agreement_pct": [r(lo * 100, 1), r(hi * 100, 1)], "kappa": r(kappa)})
+    else:
+        m = {i: len(table[i]) for i in items}
+        if len(set(m.values())) != 1:
+            fail("with more than 2 raters, every item needs the same number of ratings")
+        n = list(m.values())[0]
+        N = len(items)
+        nij = [[sum(1 for v in table[i].values() if v == c) for c in cats] for i in items]
+        pj = [sum(row[j] for row in nij) / (N * n) for j in range(len(cats))]
+        Pi = [(sum(x * x for x in row) - n) / (n * (n - 1)) for row in nij]
+        Pbar, Pe = sum(Pi) / N, sum(p * p for p in pj)
+        kappa = (Pbar - Pe) / (1 - Pe) if Pe < 1 else 1.0
+        allsame = sum(1 for row in nij if max(row) == n)
+        lo, hi = wilson(allsame, N)
+        out.update({"method": f"Fleiss' kappa ({n} ratings per item)", "kappa": r(kappa),
+                    "items_all_raters_agree_pct": r(allsame / N * 100, 1),
+                    "ci_95_all_agree_pct": [r(lo * 100, 1), r(hi * 100, 1)]})
+    if standard:
+        per = {}
+        for rt in raters:
+            judged = [i for i in items if rt in table[i] and i in standard]
+            ok = sum(1 for i in judged if table[i][rt] == standard[i])
+            if judged:
+                lo, hi = wilson(ok, len(judged))
+                per[rt] = {"correct_pct": r(ok / len(judged) * 100, 1), "n": len(judged),
+                           "ci_95_pct": [r(lo * 100, 1), r(hi * 100, 1)]}
+        out["vs_standard"] = per
+    k = out["kappa"]
+    out["plain"] = ("Raters agree well beyond chance." if k >= 0.75 else
+                    "Raters agree only moderately: the definition or training needs work before these ratings decide anything."
+                    if k >= 0.4 else "Raters often disagree: these ratings cannot be trusted yet — fix the definition first.")
+    out["basis"] = ("Kappa = agreement beyond what chance would give. Bands used for the plain sentence (0.75 / 0.40) "
+                    "are a common rule of thumb, not a law; look at which categories are confused.")
+    if len(items) < 30:
+        out["warning"] = f"Only {len(items)} items: agreement figures are rough; 30-50 items is more usual."
+    return out
+
+
+# ---------- gauge study for measured values (crossed, ANOVA method) ----------
+
+def gauge_rr(rows, tol=None):
+    data = {}
+    for rw in rows:
+        v = finite([rw.get("value")], "value")[0]
+        data.setdefault((rw.get("part", ""), rw.get("operator", "")), []).append(v)
+    parts = sorted({k[0] for k in data}); ops = sorted({k[1] for k in data})
+    if len(parts) < 2 or len(ops) < 2:
+        fail("need at least 2 parts and 2 operators")
+    reps = {len(v) for v in data.values()}
+    if len(reps) != 1 or len(data) != len(parts) * len(ops) or min(reps) < 2:
+        fail("every part x operator cell needs the same number (2 or more) of repeat measurements")
+    rr_, p, o = reps.pop(), len(parts), len(ops)
+    allv = [v for vs in data.values() for v in vs]
+    g = statistics.mean(allv)
+    mp = {pt: statistics.mean([v for (a, b), vs in data.items() if a == pt for v in vs]) for pt in parts}
+    mo = {op: statistics.mean([v for (a, b), vs in data.items() if b == op for v in vs]) for op in ops}
+    mc = {k: statistics.mean(vs) for k, vs in data.items()}
+    ssp = o * rr_ * sum((mp[x] - g) ** 2 for x in parts)
+    sso = p * rr_ * sum((mo[x] - g) ** 2 for x in ops)
+    ssi = rr_ * sum((mc[(a, b)] - mp[a] - mo[b] + g) ** 2 for a in parts for b in ops)
+    sse = sum((v - mc[k]) ** 2 for k, vs in data.items() for v in vs)
+    dfp, dfo, dfi, dfe = p - 1, o - 1, (p - 1) * (o - 1), p * o * (rr_ - 1)
+    msp, mso, msi, mse = ssp / dfp, sso / dfo, ssi / dfi, sse / dfe
+    p_int = f_sf(msi / mse, dfi, dfe) if mse > 0 else 0.0
+    if p_int > 0.25:  # interaction negligible: pool it into repeatability
+        mse = (ssi + sse) / (dfi + dfe)
+        v_int, msden = 0.0, mse
+    else:
+        v_int, msden = max(0.0, (msi - mse) / rr_), msi
+    v_rep = mse
+    v_op = max(0.0, (mso - msden) / (p * rr_))
+    v_part = max(0.0, (msp - msden) / (o * rr_))
+    v_grr = v_rep + v_op + v_int
+    v_tot = v_grr + v_part
+    if v_tot == 0:
+        fail("no variation at all")
+    pct = lambda v: r(math.sqrt(v / v_tot) * 100, 1)
+    ndc = int(1.41 * math.sqrt(v_part / v_grr)) if v_grr > 0 else None
+    out = {"status": "ok", "parts": p, "operators": o, "repeats": rr_,
+           "interaction_p": r(p_int), "interaction_pooled": p_int > 0.25,
+           "pct_study_var": {"repeatability": pct(v_rep), "reproducibility": pct(v_op + v_int),
+                             "total_gauge": pct(v_grr), "part_to_part": pct(v_part)},
+           "distinct_categories": ndc,
+           "basis": "Crossed gauge study, two-way ANOVA; interaction pooled when p > 0.25; % of study variation uses "
+                    "standard deviations."}
+    if tol:
+        out["pct_tolerance_total_gauge"] = r(6 * math.sqrt(v_grr) / tol * 100, 1)
+    gpct = math.sqrt(v_grr / v_tot) * 100
+    out["plain"] = ("The measurement is good enough to tell parts apart." if gpct < 10 else
+                    "The measurement may be acceptable, depending on the use — check against the tolerance." if gpct < 30
+                    else "The measurement system adds too much variation: fix it before trusting differences between items.")
+    if p < 10:
+        out["warning"] = f"Only {p} parts: the usual study uses about 10 parts covering the real range."
+    return out
+
+
+# ---------- two-level factorial experiments ----------
+
+def doe_design(k, reps=1, seed=1):
+    if not 2 <= k <= 5:
+        fail("k must be 2 to 5 factors (more factors: use a screening design with a specialist)")
+    if reps < 1:
+        fail("replicates must be at least 1")
+    import random as _r
+    runs = []
+    for rep in range(reps):
+        for i in range(2 ** k):
+            runs.append({"std_order": i + 1, "replicate": rep + 1,
+                         **{f"F{j + 1}": (1 if (i >> j) & 1 else -1) for j in range(k)}})
+    order = list(range(len(runs)))
+    _r.Random(seed).shuffle(order)
+    for pos, i in enumerate(order):
+        runs[i]["run_order"] = pos + 1
+    return {"status": "ok", "factors": k, "runs": len(runs), "replicates": reps,
+            "design": sorted(runs, key=lambda x: x["run_order"]),
+            "how": "Run in run_order (randomised). -1/+1 = the low/high setting you chose for each factor. "
+                   "Hold everything else as steady as you can and record anything unusual.",
+            "plain": f"{len(runs)} runs: every combination of {k} factors at two settings"
+                     + (f", repeated {reps} times." if reps > 1 else ", once each (no repeats).")}
+
+
+def doe_analyze(rows, factors, response):
+    import itertools
+    k = len(factors)
+    if not 2 <= k <= 5:
+        fail("give 2 to 5 factor columns")
+    X, y = [], []
+    for rw in rows:
+        lv = []
+        for f_ in factors:
+            v = (rw.get(f_) or "").strip()
+            if v not in ("-1", "1", "+1"):
+                fail(f"factor {f_} must be coded -1 or +1 (got '{v}')")
+            lv.append(1 if v in ("1", "+1") else -1)
+        X.append(lv); y.append(finite([rw.get(response)], response)[0])
+    cells = {}
+    for lv, v in zip(X, y):
+        cells.setdefault(tuple(lv), []).append(v)
+    if len(cells) != 2 ** k:
+        fail(f"a full factorial needs all {2 ** k} combinations; found {len(cells)}")
+    reps = {len(v) for v in cells.values()}
+    if len(reps) != 1:
+        fail("every combination needs the same number of runs")
+    n = len(y)
+    terms = [c for m in range(1, k + 1) for c in itertools.combinations(range(k), m)]
+    eff = {}
+    for t in terms:
+        sgn = [math.prod(lv[j] for j in t) for lv in X]
+        eff[":".join(factors[j] for j in t)] = sum(s_ * v for s_, v in zip(sgn, y)) / (n / 2)
+    out = {"status": "ok", "runs": n, "mean": r(statistics.mean(y)),
+           "effects": {t: r(e) for t, e in sorted(eff.items(), key=lambda kv: -abs(kv[1]))}}
+    rep = reps.pop()
+    if rep > 1:
+        sse = sum((v - statistics.mean(vs)) ** 2 for vs in cells.values() for v in vs)
+        dfe = n - 2 ** k
+        se = 2 * math.sqrt(sse / dfe / n)
+        tq = t_ppf(0.975, dfe)
+        out["significance"] = {t: {"p": r(t_sf2(abs(e) / se, dfe)), "ci_95": [r(e - tq * se), r(e + tq * se)]}
+                               for t, e in eff.items()}
+        real = [t for t, e in eff.items() if t_sf2(abs(e) / se, dfe) < 0.05]
+        out["basis"] = "Replicated full factorial: effects tested against the pure-error variance (t test)."
+    else:
+        a = [abs(e) for e in eff.values()]
+        s0 = 1.5 * statistics.median(a)
+        pse = 1.5 * statistics.median([v for v in a if v < 2.5 * s0]) if any(v < 2.5 * s0 for v in a) else s0
+        me = t_ppf(0.975, len(a) / 3) * pse
+        out["lenth"] = {"pse": r(pse), "margin_of_error": r(me)}
+        real = [t for t, e in eff.items() if abs(e) > me]
+        out["basis"] = ("Unreplicated full factorial: effects judged with Lenth's pseudo standard error "
+                        "(effects larger than the margin of error stand out from noise).")
+    out["active"] = real
+    out["plain"] = ("Effects that stand out from noise: " + ", ".join(real) + ". Confirm the best setting with a "
+                    "few extra runs before adopting it." if real else
+                    "No effect stands out from noise at these settings and this number of runs.")
+    out["note"] = "Effect = change in the average response from low (-1) to high (+1). An interaction (A:B) means " \
+                  "the effect of A depends on the setting of B — never change one factor at a time when that happens."
+    return out
+
+
 def chart_svg(pts, cl, ucl, lcl, labels, title):
     w, h, pad = 700, 320, 50
     lo, hi = min(pts + lcl), max(pts + ucl)
@@ -775,6 +976,23 @@ def selftest():
     assert close(rg["slope"], 2) and close(rg["intercept"], 1) and rg["pearson_r"] == 1, rg
     rg = regress([1, 2, 3, 4, 5, 6], [2, 1, 4, 3, 6, 5])
     assert close(rg["pearson_r"], 0.8286, 1e-3) and close(rg["spearman_rho"], 0.8286, 1e-3), rg
+    # agreement: perfect and chance-level
+    perfect = {str(i): {"a": c, "b": c} for i, c in enumerate("xyxyxyxyxy")}
+    assert agreement(perfect)["kappa"] == 1.0
+    ag = agreement({str(i): {"a": c1, "b": c2} for i, (c1, c2) in enumerate(zip("xxxxxyyyyy", "xxyyyxxxyy"))})
+    assert close(ag["kappa"], -0.2, 1e-6) and ag["percent_agreement"] == 40.0, ag
+    # gauge study: identical repeats, no operator effect -> gauge share 0, parts carry all variation
+    rows_g = [{"part": str(pp), "operator": op, "value": pp * 1.0} for pp in range(10) for op in "AB" for _ in range(2)]
+    rows_g[0]["value"] = 0.01
+    g_ = gauge_rr(rows_g)
+    assert g_["pct_study_var"]["part_to_part"] > 99, g_
+    # factorial: y = 10 + 3A - 2B + 1.5AB exactly -> effects 6, -4, 3
+    des = doe_design(2, reps=2)["design"]
+    rows_d = [{"A": str(d["F1"]), "B": str(d["F2"]), "y": str(10 + 3 * d["F1"] - 2 * d["F2"] + 1.5 * d["F1"] * d["F2"]
+                                                          + (0.1 if d["replicate"] == 1 else -0.1))} for d in des]
+    da = doe_analyze(rows_d, ["A", "B"], "y")
+    assert close(da["effects"]["A"], 6) and close(da["effects"]["B"], -4) and close(da["effects"]["A:B"], 3), da
+    assert set(da["active"]) == {"A", "B", "A:B"}, da
     print("selftest ok")
 
 
@@ -804,6 +1022,14 @@ def main():
     cp_.add_argument("csv"); cp_.add_argument("--lsl", type=float); cp_.add_argument("--usl", type=float)
     rg_ = sub.add_parser("regress", help="CSV with two numeric columns; --x COL --y COL")
     rg_.add_argument("csv"); rg_.add_argument("--x", required=True); rg_.add_argument("--y", required=True)
+    ag_ = sub.add_parser("agree", help="CSV item,rater,rating (one row per rating); --standard NAME marks the reference rater")
+    ag_.add_argument("csv"); ag_.add_argument("--standard")
+    gr_ = sub.add_parser("grr", help="CSV part,operator,value with 2+ repeats per cell; --tol optional")
+    gr_.add_argument("csv"); gr_.add_argument("--tol", type=float)
+    de_ = sub.add_parser("doe", help="design K [--reps R --seed S] · analyze CSV --factors A,B,.. --response Y")
+    de_.add_argument("action", choices=["design", "analyze"]); de_.add_argument("arg")
+    de_.add_argument("--reps", type=int, default=1); de_.add_argument("--seed", type=int, default=1)
+    de_.add_argument("--factors"); de_.add_argument("--response")
     s = sub.add_parser("size")
     s.add_argument("kind", choices=["mean", "proportion", "two-proportions"])
     for k in ("margin", "sd", "p", "p1", "p2"):
@@ -884,6 +1110,30 @@ def main():
                 with open(x.svg, "w", encoding="utf-8") as f:
                     f.write(chart_svg(pts, cl, ucl, lcl, labels, x.title))
                 res["svg"] = x.svg
+        elif x.cmd == "agree":
+            table, std = {}, {}
+            for rw in read_csv(x.csv):
+                it, rt, rating = rw.get("item", ""), rw.get("rater", ""), (rw.get("rating") or "").strip()
+                if not it or not rt or rating == "":
+                    fail("every row needs item, rater and rating")
+                if x.standard and rt == x.standard:
+                    std[it] = rating
+                else:
+                    table.setdefault(it, {})[rt] = rating
+            res = agreement(table, std or None)
+        elif x.cmd == "grr":
+            res = gauge_rr(read_csv(x.csv), x.tol)
+        elif x.cmd == "doe":
+            if x.action == "design":
+                try:
+                    k = int(x.arg)
+                except ValueError:
+                    fail("doe design needs the number of factors, e.g. doe design 3")
+                res = doe_design(k, x.reps, x.seed)
+            else:
+                if not (x.factors and x.response):
+                    fail("doe analyze needs --factors A,B,.. and --response COL")
+                res = doe_analyze(read_csv(x.arg), [f.strip() for f in x.factors.split(",")], x.response)
         elif x.cmd == "capability":
             res = capability([rw.get("value") for rw in read_csv(x.csv) if rw.get("value", "") != ""], x.lsl, x.usl)
         elif x.cmd == "regress":
