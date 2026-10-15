@@ -92,6 +92,40 @@ for _ in range(300):
     ref = stats.f_oneway(*g.values())
     same(av["F"], ref.statistic, 1e-3, "ANOVA F"); same(av["p"], ref.pvalue, 1e-4, "ANOVA p")
 
+# correlation and regression
+for _ in range(300):
+    n = rng.randint(5, 60)
+    xs = [rng.uniform(0, 100) for _ in range(n)]
+    ys = [3 + 0.5 * v + rng.gauss(0, rng.choice([1, 10, 40])) for v in xs]
+    rg = st.regress(xs, ys)
+    lr = stats.linregress(xs, ys)
+    same(rg["slope"], lr.slope, 1e-3 * max(1, abs(lr.slope)), "slope")
+    same(rg["intercept"], lr.intercept, 1e-3 * max(1, abs(lr.intercept)), "intercept")
+    same(rg["pearson_r"], lr.rvalue, 1e-4, "pearson r")
+    same(rg["p_two_sided"], lr.pvalue, 1e-4, "regression p")
+    ci = stats.pearsonr(xs, ys).confidence_interval()
+    same(rg["ci_95_r"][0], ci.low, 1e-3, "r ci low"); same(rg["ci_95_r"][1], ci.high, 1e-3, "r ci high")
+    same(rg["spearman_rho"], stats.spearmanr(xs, ys).statistic, 1e-4, "spearman")
+    tq = stats.t.ppf(0.975, n - 2)
+    same(rg["ci_95_slope"][0], lr.slope - tq * lr.stderr, 1e-3 * max(1, abs(lr.slope)), "slope ci")
+
+# capability against direct numpy formulas (stable synthetic processes)
+for _ in range(200):
+    n = rng.randint(20, 80)
+    xs = [rng.gauss(50, 2) for _ in range(n)]
+    lsl, usl = 50 - rng.uniform(4, 12), 50 + rng.uniform(4, 12)
+    try:
+        cap = st.capability(xs, lsl, usl)
+    except st.InputError:
+        continue  # an unstable-looking sample is refused, by design
+    arr = np.array(xs)
+    sw = np.mean(np.abs(np.diff(arr))) / 1.128
+    so = np.std(arr, ddof=1)
+    mu = arr.mean()
+    same(cap["Cp"], (usl - lsl) / (6 * sw), 1e-3, "Cp")
+    same(cap["Cpk"], min(usl - mu, mu - lsl) / (3 * sw), 1e-3, "Cpk")
+    same(cap["Ppk"], min(usl - mu, mu - lsl) / (3 * so), 1e-3, "Ppk")
+
 # control-chart constants against first principles
 d2 = 2 / math.sqrt(math.pi)  # expected range of 2 normal values in sd units = 1.128
 same(1.128, d2, 5e-4, "d2 constant")

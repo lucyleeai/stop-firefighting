@@ -81,7 +81,7 @@ target; (3) only then the data's shape.
 |  | Same items before vs after | Paired t — `ttest --paired` | run |
 |  | Three or more groups | One-way ANOVA — `anova` | run |
 |  | Is the spread different? | F-test / Levene | later |
-|  | Does Y move with X? | Correlation and regression | later |
+|  | Does Y move with X? | Correlation and a straight line — `regress --x COL --y COL` (association only) | run |
 |  | Is it roughly normal? | Plot first (histogram) | guided |
 | Counted (yes/no, defective, late) | Two proportions (pilot vs before, team A vs B) | **Two-proportion test** + Fisher exact — `prop --x1 --n1 --x2 --n2` | run |
 |  | Proportion vs a target | One-proportion test — `prop --x1 --n1 --p0` | run |
@@ -98,7 +98,13 @@ normal for it.
 
 ## E. Is it stable over time? (control charts)
 
-Script: `stats_tools.py chart imr|p|u data.csv --svg chart.svg` (rules 1–2 by default).
+Script: `stats_tools.py chart imr|p|u data.csv --svg chart.svg` (rules 1–2 by default; `--rules 1,2,3,4,5,6,7,8` adds the
+rules for small sustained shifts — more rules, more false alarms).
+
+**Stable, but good enough?** Once a chart shows no signal, compare the process
+with the requirement: `stats_tools.py capability data.csv --lsl … --usl …`
+(refuses an unstable process; the share outside the requirement is reported
+alongside the indices).
 
 | Data | How it arrives | Chart | Status |
 |---|---|---|---|
@@ -132,6 +138,9 @@ State what you are trying to do, then size it:
 - **Estimate** a mean or a proportion to within ± a margin → sample size from the margin and the spread (or the expected proportion).
 - **Detect** a difference of a given size → power calculation.
 - A histogram of six points is not a histogram; proportions need far more data than measurements.
+- **Few data points** (common in office work): say what the data can and cannot show, prefer a plot and the
+  rank-based test, use exact tests for counts (the script switches to Fisher automatically), and plan how many
+  more occurrences are needed before deciding (`size`). Do not quote a "minimum sample" rule of thumb as fact.
 
 Script: `stats_tools.py size mean --sd --margin` · `size proportion --p --margin`
 · `size two-proportions --p1 --p2` (per group, 80% power). Status: run.

@@ -11,7 +11,10 @@ reports comes from here, never from the model's own arithmetic.
   prop      one-proportion or two-proportion comparison (+ Fisher exact for 2x2)
   chisq     chi-square test of association on a table of counts
   anova     one-way ANOVA on measured data in groups
-  chart     control chart: imr (individual values), p (defectives/sample), u (defects/unit)
+  chart     control chart: imr (individual values), p (defectives/sample), u (defects/unit);
+            --rules picks any of Nelson rules 1-8 (default 1,2)
+  capability  process capability against a requirement (refuses an unstable process)
+  regress   correlation (Pearson with interval, Spearman) and a least-squares line
   size      sample size: estimate a mean or proportion, or detect a difference in proportions
   selftest  run the built-in checks
 
@@ -435,7 +438,7 @@ def anova(groups):
 # ---------- control charts ----------
 
 def run_rules(values, centre, sigma, rules):
-    """Nelson rules 1-4; each hit is reported at the point that completes the pattern."""
+    """Nelson rules 1-8; each hit is reported at the point that completes the pattern."""
     hits, n = {}, len(values)
     if 1 in rules:
         hits["1_beyond_3_sigma"] = [i for i, v in enumerate(values) if sigma[i] and abs(v - centre[i]) > 3 * sigma[i]]
@@ -453,6 +456,21 @@ def run_rules(values, centre, sigma, rules):
             if all(dd[k] * dd[k + 1] < 0 for k in range(12)):
                 idx.append(i)
         hits["4_fourteen_alternating"] = idx
+    z = [((v - c) / sg) if sg else 0.0 for v, c, sg in zip(values, centre, sigma)]
+    if 5 in rules:
+        hits["5_two_of_three_beyond_2_sigma"] = [
+            i for i in range(2, n)
+            if sum(1 for k in range(i - 2, i + 1) if z[k] > 2) >= 2 and z[i] > 2
+            or sum(1 for k in range(i - 2, i + 1) if z[k] < -2) >= 2 and z[i] < -2]
+    if 6 in rules:
+        hits["6_four_of_five_beyond_1_sigma"] = [
+            i for i in range(4, n)
+            if sum(1 for k in range(i - 4, i + 1) if z[k] > 1) >= 4 and z[i] > 1
+            or sum(1 for k in range(i - 4, i + 1) if z[k] < -1) >= 4 and z[i] < -1]
+    if 7 in rules:
+        hits["7_fifteen_within_1_sigma"] = [i for i in range(14, n) if all(abs(z[k]) < 1 for k in range(i - 14, i + 1))]
+    if 8 in rules:
+        hits["8_eight_outside_1_sigma"] = [i for i in range(7, n) if all(abs(z[k]) > 1 for k in range(i - 7, i + 1))]
     return hits
 
 
@@ -513,6 +531,101 @@ def chart(kind, rows, rules=(1, 2)):
                     else "No signal on the rules checked: the variation looks routine for this process. "
                          "That says nothing about whether the level is acceptable.")
     return out, pts, cl, ucl, lcl, labels
+
+
+# ---------- process capability ----------
+
+def capability(values, lsl=None, usl=None):
+    x = finite(values, "value")
+    need(len(x), 20, "capability (at least 20 values in time order)")
+    if lsl is None and usl is None:
+        fail("give --lsl and/or --usl (the customer's requirement, not control limits)")
+    if lsl is not None and usl is not None and lsl >= usl:
+        fail("--lsl must be below --usl")
+    stab = chart("imr", [{"value": v} for v in x], rules=(1, 2))[0]
+    flagged = [k for k, v in stab["signals"].items() if v]
+    if flagged:
+        fail("the process is not stable (signals: " + ", ".join(flagged) + "); a capability index would be "
+             "misleading — find and remove the special causes first, then measure again")
+    mu = statistics.mean(x)
+    mr = [abs(b - a) for a, b in zip(x, x[1:])]
+    s_within = statistics.mean(mr) / 1.128
+    s_overall = statistics.stdev(x)
+    def idx(s):
+        parts = []
+        if usl is not None:
+            parts.append((usl - mu) / (3 * s))
+        if lsl is not None:
+            parts.append((mu - lsl) / (3 * s))
+        both = (usl - lsl) / (6 * s) if (usl is not None and lsl is not None) else None
+        return both, min(parts)
+    cp, cpk = idx(s_within)
+    pp, ppk = idx(s_overall)
+    outside = sum(1 for v in x if (usl is not None and v > usl) or (lsl is not None and v < lsl))
+    out = {"status": "ok", "n": len(x), "mean": r(mu), "sigma_within": r(s_within), "sigma_overall": r(s_overall),
+           "Cp": r(cp) if cp is not None else None, "Cpk": r(cpk), "Pp": r(pp) if pp is not None else None,
+           "Ppk": r(ppk), "observed_outside_spec": outside, "skewness": r(skewness(x)),
+           "basis": "Stable on individuals-chart rules 1-2. Cp/Cpk use within sigma (average moving range / 1.128); "
+                    "Pp/Ppk use the overall standard deviation. Indices assume roughly normal data.",
+           "plain": (f"Of {len(x)} values, {outside} fell outside the requirement. "
+                     f"Cpk {r(cpk, 2)}: " + ("the process fits inside the requirement with room to spare."
+                                             if cpk >= 1.33 else "the process fits but with little room."
+                                             if cpk >= 1.0 else "the process spread does not fit inside the requirement."))}
+    if abs(skewness(x)) > 1:
+        out["warning"] = "Data are clearly skewed: normal-based indices mislead. Report the share outside spec instead."
+    elif len(x) < 50:
+        out["warning"] = f"Only {len(x)} values: indices are rough (they can move by 0.2 or more with new data)."
+    return out
+
+
+# ---------- correlation and simple regression ----------
+
+def regress(xs, ys):
+    if len(xs) != len(ys):
+        fail("x and y need the same number of rows")
+    x, y = finite(xs, "x"), finite(ys, "y")
+    n = len(x)
+    need(n, 5, "regression")
+    mx, my = statistics.mean(x), statistics.mean(y)
+    sxx = sum((a - mx) ** 2 for a in x)
+    syy = sum((b - my) ** 2 for b in y)
+    if sxx == 0 or syy == 0:
+        fail("x or y does not vary: no relationship can be measured")
+    sxy = sum((a - mx) * (b - my) for a, b in zip(x, y))
+    slope = sxy / sxx
+    icpt = my - slope * mx
+    rr = sxy / math.sqrt(sxx * syy)
+    df = n - 2
+    resid = [b - (icpt + slope * a) for a, b in zip(x, y)]
+    s2 = sum(e * e for e in resid) / df
+    se_slope = math.sqrt(s2 / sxx)
+    tq = t_ppf(0.975, df)
+    if abs(rr) >= 1:
+        p, ci_r = 0.0, [r(rr), r(rr)]
+    else:
+        tstat = rr * math.sqrt(df / (1 - rr * rr))
+        p = t_sf2(tstat, df)
+        zr, se_z = math.atanh(rr), 1 / math.sqrt(n - 3) if n > 3 else float("inf")
+        ci_r = [r(math.tanh(zr - 1.959964 * se_z)), r(math.tanh(zr + 1.959964 * se_z))] if n > 3 else None
+    rx, _ = _ranks(x)
+    ry, _ = _ranks(y)
+    mrx, mry = statistics.mean(rx), statistics.mean(ry)
+    rho = (sum((a - mrx) * (b - mry) for a, b in zip(rx, ry))
+           / math.sqrt(sum((a - mrx) ** 2 for a in rx) * sum((b - mry) ** 2 for b in ry)))
+    out = {"status": "ok", "n": n, "pearson_r": r(rr), "ci_95_r": ci_r, "r_squared": r(rr * rr),
+           "spearman_rho": r(rho), "slope": r(slope),
+           "ci_95_slope": [r(slope - tq * se_slope), r(slope + tq * se_slope)], "intercept": r(icpt),
+           "p_two_sided": r(p),
+           "basis": "Least squares line; Pearson r with Fisher-z interval; Spearman rho on ranks (robust to outliers).",
+           "not_a_cause": "A relationship in data is an association. It becomes a cause only when other explanations "
+                          "are ruled out, e.g. by a trial that changes x on purpose.",
+           "plain": (f"y changes by about {r(slope, 3)} per unit of x (95% range {r(slope - tq * se_slope, 3)} "
+                     f"to {r(slope + tq * se_slope, 3)}); x explains {round(rr * rr * 100)}% of the variation in y.")}
+    if abs(rr - rho) > 0.3:
+        out["warning"] = "Pearson and Spearman disagree: a few extreme points or a curve drive the result — plot it."
+    if n < 10:
+        out.setdefault("warning", f"Only {n} pairs: the line is rough.")
+    return out
 
 
 def chart_svg(pts, cl, ucl, lcl, labels, title):
@@ -643,6 +756,25 @@ def selftest():
     ws = wilcoxon_signed([5, 6, 7, 8, 9, 10, 11, 12], [1, 2, 3, 4, 5, 6, 7, 8])
     assert ws["median_difference"] == 4 and ws["W_plus"] == 36, ws
     assert size("mean", margin=2, sd=10)["sample_size"] == 97
+    # Nelson 5-8 on hand-built z-patterns (centre 0, sigma 1)
+    c1, s1 = [0.0] * 20, [1.0] * 20
+    assert run_rules([0, 0, 2.5, 0, 2.5] + [0] * 15, c1, s1, {5})["5_two_of_three_beyond_2_sigma"] == [4]
+    assert run_rules([1.5, 1.5, 0, 1.5, 1.5] + [0] * 15, c1, s1, {6})["6_four_of_five_beyond_1_sigma"] == [4]
+    assert run_rules([0.1] * 15 + [3] * 5, c1, s1, {7})["7_fifteen_within_1_sigma"] == [14]
+    assert run_rules([1.5, -1.5] * 4 + [0] * 12, c1, s1, {8})["8_eight_outside_1_sigma"] == [7]
+    # capability: refuses an unstable process; textbook arithmetic on a stable one
+    try:
+        capability([10] * 10 + [10.2] * 5 + [30] + [10.1] * 6, lsl=0, usl=40)
+        raise AssertionError("unstable process accepted")
+    except InputError:
+        pass
+    cap = capability([10, 11, 10, 11] * 6, lsl=4, usl=17)
+    assert close(cap["Cp"], (17 - 4) / (6 * (1 / 1.128))) and cap["observed_outside_spec"] == 0, cap
+    # regression: exact line, and a known correlation
+    rg = regress([1, 2, 3, 4, 5], [3, 5, 7, 9, 11])
+    assert close(rg["slope"], 2) and close(rg["intercept"], 1) and rg["pearson_r"] == 1, rg
+    rg = regress([1, 2, 3, 4, 5, 6], [2, 1, 4, 3, 6, 5])
+    assert close(rg["pearson_r"], 0.8286, 1e-3) and close(rg["spearman_rho"], 0.8286, 1e-3), rg
     print("selftest ok")
 
 
@@ -668,6 +800,10 @@ def main():
     ch = sub.add_parser("chart", help="imr: label,value · p: label,count,n · u: label,count,n")
     ch.add_argument("kind", choices=["imr", "p", "u"]); ch.add_argument("csv")
     ch.add_argument("--rules", default="1,2"); ch.add_argument("--svg"); ch.add_argument("--title", default="Control chart")
+    cp_ = sub.add_parser("capability", help="CSV label,value in time order; --lsl and/or --usl (the requirement)")
+    cp_.add_argument("csv"); cp_.add_argument("--lsl", type=float); cp_.add_argument("--usl", type=float)
+    rg_ = sub.add_parser("regress", help="CSV with two numeric columns; --x COL --y COL")
+    rg_.add_argument("csv"); rg_.add_argument("--x", required=True); rg_.add_argument("--y", required=True)
     s = sub.add_parser("size")
     s.add_argument("kind", choices=["mean", "proportion", "two-proportions"])
     for k in ("margin", "sd", "p", "p1", "p2"):
@@ -748,6 +884,11 @@ def main():
                 with open(x.svg, "w", encoding="utf-8") as f:
                     f.write(chart_svg(pts, cl, ucl, lcl, labels, x.title))
                 res["svg"] = x.svg
+        elif x.cmd == "capability":
+            res = capability([rw.get("value") for rw in read_csv(x.csv) if rw.get("value", "") != ""], x.lsl, x.usl)
+        elif x.cmd == "regress":
+            rows = [rw for rw in read_csv(x.csv) if rw.get(x.x, "") != "" and rw.get(x.y, "") != ""]
+            res = regress([rw[x.x] for rw in rows], [rw[x.y] for rw in rows])
         else:
             res = size(x.kind, x.margin, x.sd, x.p, x.p1, x.p2, power=x.power)
     except (InputError, ArithmeticError) as e:

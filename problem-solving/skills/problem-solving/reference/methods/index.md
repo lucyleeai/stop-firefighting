@@ -16,4 +16,4 @@ Each card can be used on its own — when the user asks for one method ("just do
 | `../people/guide.md` | a person's action is part of a failure | kind of error and the countermeasure that fits | no |
 | `../failure-types.md` | any failure, any actor | observable failure type and fitting changes | no |
 
-Not bundled (name it, say what it needs, do not compute by hand): process capability studies, full designed experiments, formal gauge studies, multi-variable regression. Never used as a basis for decisions: automatic personal blame, charts as proof of cause, generic error probabilities or unverified minimum sample sizes.
+Not bundled (name it, say what it needs, do not compute by hand): full designed experiments, formal gauge studies, multi-variable regression. Capability and simple regression are in `stats_tools.py` (`capability`, `regress`). Never used as a basis for decisions: automatic personal blame, charts as proof of cause, generic error probabilities or unverified minimum sample sizes.
