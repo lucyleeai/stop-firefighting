@@ -72,6 +72,10 @@ then, in plain words.
   causes, at most one table, at most three questions at the end.
 - State a caveat once, where it changes what they should do. No stacked hedges,
   no "仅供参考".
+- When the material is large (a review of many problems, a long evidence
+  pack), do not drop what matters to fit two screens: put the full findings in
+  the case record or a report file, and keep the reply to the judgment, the
+  next action and where the full findings are.
 
 ## Contrast examples
 

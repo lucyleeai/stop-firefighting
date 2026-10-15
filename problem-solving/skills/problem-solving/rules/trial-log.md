@@ -24,7 +24,10 @@ save):
 ```
 
 The success threshold is set before the trial starts. Do not move it after
-seeing the result.
+seeing the result. If the user gives no bar or date, propose defaults they can
+change: a bar tied to their own requirement (or "back to the level before the
+problem started"), and a check date after enough occurrences to judge — use
+`stats_tools.py size` when a rate is involved. Never leave either blank.
 
 ## When the user comes back
 

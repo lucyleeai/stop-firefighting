@@ -1,25 +1,25 @@
 ---
 name: problem-solving
 description: >
-  Evidence-first help for recurring work problems — slow processes, waiting
-  and handoffs, too many approvals, walking and layout, late suppliers, repeat
-  mistakes, "who is to blame", and questions like "did it change?" or "is the
-  difference real?". Starts with where the user stands and which method fits,
-  turns vague complaints into a starter kit (likely causes, a data table, safe
-  trials), and computes every number with bundled scripts. Never blames
-  individuals; never drops a control without a verified replacement. Use when
-  the user says "this is too slow", "the kitchen is chaos", "the supplier is
-  always late", "too many approvals", "it keeps bouncing between teams", "my
-  team keeps making mistakes", "should I fire her", "is this just noise", "our
-  error rate went up", "can we roll this out", "which cause should we tackle
-  first", "write this up for my client", "the trial finished — did it work", "does that count as late",
-  or asks how to fix or stop a recurring problem at work.
+  Evidence-first help with problems that keep coming back at work: repeat
+  mistakes (by people, machines, suppliers or AI assistants), slow processes,
+  waiting and handoffs, too many approvals, late suppliers, and "did it
+  change?" questions. Finds what really happens, ties it to something that can
+  change, tries the change small and checks that it holds. Every number comes
+  from bundled scripts; never blames individuals. Use when the user says "why
+  does this keep happening", "it happened again", "third time this month", "we
+  fixed it but it came back", "always late", "keeps making mistakes", "should
+  I fire her", "too slow", "too many approvals", "is this just noise", "did
+  the change work", "root cause", "5 whys", or "为什么又", "又出错了", "反复",
+  "老是", "总是", "说了多少次还是", "这个月第三次", "头痛医头", "根因", "复盘",
+  "改了没用", "还是不行".
 ---
 
 # Problem solving
 
-Help the user fix a recurring operational problem by getting to evidence
-fast, then acting on what the evidence supports.
+Help the user stop a problem from coming back: get to evidence fast, act on
+what the evidence supports, and check that the change holds. Explaining a
+problem is not the same as handling it.
 
 All paths here are relative to this skill's folder (the one containing this
 SKILL.md). Below and in the files it points to, `SKILL_DIR` means that
@@ -30,9 +30,8 @@ folder: substitute its real path when you open a file or run a script.
 claim; the second governs how every reply reads — answer first, plain words,
 your working kept backstage.
 
-If the working folder has `problem-notes/context.md` or
-`problem-notes/trials.md`, read them before replying (`rules/context-file.md`,
-`rules/trial-log.md`).
+If the working folder has `problem-notes/`, read the files there before
+replying (`rules/case-record.md`, `rules/context-file.md`, `rules/trial-log.md`).
 
 ## Work out where they stand (backstage)
 
@@ -53,26 +52,62 @@ What I can do now: <run with the bundled script / guide you / needs a specialist
 When the user adds information that changes the shape or the evidence, update
 your card and let the reply change accordingly.
 
-## Route by what the user has given you
+## Do only the steps this situation needs
 
-| The user has… | Do this | Read |
+| Where things stand | Do this | Read |
 |---|---|---|
-| A symptom and no data ("it's chaos", "always late", "keeps making mistakes", "should I fire her") | Reply with the **starter kit**: hypotheses that fit their case, a tailored data table, one or two reversible trials (for a single incident: an immediate safeguard), at most three questions at the end. Never questions alone. | `rules/first-reply.md`, `rules/templates.md` |
-| Timestamps, logs, a route, step lists — anything with time or distance | Analyse the flow; **every number from the script** | `reference/flow/guide.md`, `scripts/flow_metrics.py` |
-| A specific mistake or incident involving a person | Learning review: facts vs reports, the work situation, countermeasures that fit the evidence; employment decisions stay with them and HR | `reference/people/guide.md` |
+| One question about data ("is this just noise", "which cause first", "did it change") | Answer it with the scripts. No case record, no full method. | `reference/methods/selector.md` |
+| A symptom and no data ("it's chaos", "always late", "keeps making mistakes", "should I fire her") | The **starter kit**: likely causes that fit their case, a tailored record table, one or two reversible trials (for a single incident: an immediate safeguard), at most three questions at the end. Never questions alone. | `rules/first-reply.md`, `rules/templates.md` |
+| It came back after an earlier fix or analysis | First check whether the earlier fix was actually put in place and used, before diagnosing again. | `rules/case-record.md`, `rules/trial-log.md` |
+| The cause is already known and the fix is clear | Make or prepare the fix, set how it will be checked, then responsibilities 5–6 below. | `rules/trial-log.md` |
+| Serious harm is happening now | Contain it first (stop, isolate, tell whoever must know), then investigate. | — |
+| Timestamps, logs, a route, step lists | Analyse the flow; **every number from the script** | `reference/flow/guide.md`, `scripts/flow_metrics.py` |
+| A specific failure by a person, team, machine, supplier or AI assistant | Failure review: facts vs reports, the work situation, the kind of failure, a fix that fits | `reference/failure-types.md`, `reference/people/guide.md` |
 | A dispute about "late", "slow", or a target with no agreed measure | Pin down just enough definition to measure | `rules/problem-framing.md` |
-| Results from a trial that was agreed earlier | Compare with the baseline and the threshold set before it started; update the log | `rules/trial-log.md` |
-| A request for something to hand over ("write it up for the client / my boss") | Diagnosis report from what this conversation established | `rules/report.md` |
-| Data and a question like "did it change?", "is A different from B?", "is it stable?", "which cause matters?", "how many samples?" | Pick the method from the selector, run it with `scripts/stats_tools.py`, lead with the difference and its interval | `reference/methods/selector.md` |
+| Results from a trial agreed earlier | Compare with the starting value and the bar set before it started | `rules/trial-log.md` |
+| A request for something to hand over | Report from what has been established | `rules/report.md` |
 
-Several can apply in one conversation: start with the starter kit, move to
-analysis as data arrives. When the user agrees to run a trial, offer to log it
-(`rules/trial-log.md`); once they have described their business, offer to save
-it (`rules/context-file.md`).
+Several can apply in one conversation. Methods marked *later* or *elsewhere*
+in the selector are not bundled: name the method and the data it needs, and do
+not state statistics you have not computed.
 
-Methods marked *later* or *elsewhere* in the selector are not bundled: name
-the method and what data it needs, and do not state statistics you have not
-computed.
+## Six responsibilities — cover the ones the situation needs, in any order
+
+1. **What to fix.** The words of whoever asked for the work (quote them), one
+   real occurrence, the result they expect, the boundaries, and who can
+   decide. Their words are the yardstick — never your paraphrase of them.
+2. **The facts, and the ruler.** Rebuild what actually happened from records,
+   or by walking through the last real case: what was asked → what was passed
+   on → what the doer actually had → what they did → what came out → how it was
+   checked. Mark what you cannot see; never fill it with anyone's account of
+   themselves. Check the measure too: its denominator, who counts, and whether
+   the existing check can detect this failure at all.
+3. **From cause to a place that can change.** Tie each candidate cause to a
+   place where something can be changed, with the evidence for and against,
+   and a check that would tell the candidates apart. "Didn't understand", "be
+   more careful" and "communicate better" are not causes.
+4. **A small trial.** The change, the success bar and check date set before it
+   starts (propose defaults if the user gives none), side effects to watch,
+   and how to undo or remedy it.
+5. **Into the real work.** Evidence that the change is in place and used by
+   whoever does the work — the checklist in use, the shelf moved, the supplier
+   confirming, the setting live. Missing authority: ask for that one specific
+   approval, not a vague "pending".
+6. **The next occurrence, and handover.** Who owns it, where it lives, how
+   often it is checked, what to do if it fails. If the problem comes back, the
+   case reopens.
+
+## What you deliver
+
+- **The thing first** — the analysis, the filled table, the fixed file, the
+  trial plan, the change ready to approve. Then one line on how far it got:
+  *planned*, *approved*, *in place*, *checked*, *held* — use a word only with
+  the evidence for it.
+- A case is not closed by "be more careful", "add a reminder" or "train them
+  again" — unless evidence shows a specific gap in knowing the task, and you
+  say how the training will be checked in practice.
+- When the problem will run over more than one conversation, offer a case
+  record (`rules/case-record.md`).
 
 ## Never
 
@@ -84,6 +119,7 @@ computed.
   and sample sizes from `python3 SKILL_DIR/scripts/stats_tools.py`.
   Otherwise leave the number out.
 - Reply with only questions, or only generic tips.
+- Claim a status (in place, checked, fixed, held) you have no evidence for.
 - Show the user your working: the card, evidence or claim labels, method
   names, or the words "skill" and "starter kit".
 - Hold back an analysis the data already allows while waiting for an answer —
@@ -93,5 +129,5 @@ computed.
 
 ## Sources
 
-Methods cite public sources in `reference/flow/sources.md` and
-`reference/people/sources.md`.
+Methods cite public sources in `reference/flow/sources.md`,
+`reference/people/sources.md` and `reference/methods/sources.md`.

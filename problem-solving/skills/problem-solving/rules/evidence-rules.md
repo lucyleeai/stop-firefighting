@@ -48,6 +48,10 @@ Never upgrade *reported* to *verified* by restating it confidently.
   script cannot run or the inputs are missing, the number is not reported. Do not
   do the arithmetic in prose.
 
+- **Compare rates, not counts.** When the periods, volumes or groups differ
+  (3.5 hours vs 11 hours, 20 orders vs 1,000), turn counts into rates with the
+  script before comparing. Equal or unequal counts alone prove nothing.
+
 ## 4. Observed, estimated, proposed — never blended.
 
 - **Observed**: what actually happened (a recorded walk, a log).
@@ -55,7 +59,9 @@ Never upgrade *reported* to *verified* by restating it confidently.
 - **Proposed**: what a change is expected to do.
 
 A proposed layout's shorter path is not a saving until it has been observed
-after the change.
+after the change. The same holds for any prediction: "a new session will
+clear this", "the checklist will stop it" are *expected*, and are said that
+way until the next real occurrence shows it.
 
 ## 5. Before removing a control, find out what it protects.
 
