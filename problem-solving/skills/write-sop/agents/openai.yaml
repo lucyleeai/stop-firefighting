@@ -1,0 +1,5 @@
+interface:
+  display_name: "Write SOP"
+  short_description: "Write or revise a working procedure from approved material"
+policy:
+  allow_implicit_invocation: false
