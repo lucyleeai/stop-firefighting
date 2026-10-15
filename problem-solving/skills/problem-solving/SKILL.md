@@ -67,33 +67,34 @@ your card and let the reply change accordingly.
 | Results from a trial agreed earlier | Compare with the starting value and the bar set before it started | `rules/trial-log.md` |
 | A request for something to hand over | Report from what has been established | `rules/report.md` |
 
-Several can apply in one conversation. Methods marked *later* or *elsewhere*
+To use one method on its own, or to pick the method a step needs, see
+`reference/methods/index.md`. Several situations can apply in one conversation. Methods marked *later* or *elsewhere*
 in the selector are not bundled: name the method and the data it needs, and do
 not state statistics you have not computed.
 
 ## Six responsibilities — cover the ones the situation needs, in any order
 
-1. **What to fix.** The words of whoever asked for the work (quote them), one
+1. **What to fix** (`reference/methods/cards/requirement.md`). The words of whoever asked for the work (quote them), one
    real occurrence, the result they expect, the boundaries, and who can
    decide. Their words are the yardstick — never your paraphrase of them.
-2. **The facts, and the ruler.** Rebuild what actually happened from records,
+2. **The facts, and the ruler** (`reference/methods/cards/walk-and-subtract.md`, `reference/methods/cards/measurement-check.md`). Rebuild what actually happened from records,
    or by walking through the last real case: what was asked → what was passed
    on → what the doer actually had → what they did → what came out → how it was
    checked. Mark what you cannot see; never fill it with anyone's account of
    themselves. Check the measure too: its denominator, who counts, and whether
    the existing check can detect this failure at all.
-3. **From cause to a place that can change.** Tie each candidate cause to a
+3. **From cause to a place that can change** (`reference/methods/cards/cause-ledger.md`). Tie each candidate cause to a
    place where something can be changed, with the evidence for and against,
    and a check that would tell the candidates apart. "Didn't understand", "be
    more careful" and "communicate better" are not causes.
-4. **A small trial.** The change, the success bar and check date set before it
+4. **A small trial** (`reference/methods/cards/trial-and-risk.md`, `reference/methods/cards/benefit-baseline.md`). The change, the success bar and check date set before it
    starts (propose defaults if the user gives none), side effects to watch,
    and how to undo or remedy it.
 5. **Into the real work.** Evidence that the change is in place and used by
    whoever does the work — the checklist in use, the shelf moved, the supplier
    confirming, the setting live. Missing authority: ask for that one specific
    approval, not a vague "pending".
-6. **The next occurrence, and handover.** Who owns it, where it lives, how
+6. **The next occurrence, and handover** (`reference/methods/cards/control-plan.md`). Who owns it, where it lives, how
    often it is checked, what to do if it fails. If the problem comes back, the
    case reopens.
 

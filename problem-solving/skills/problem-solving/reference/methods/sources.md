@@ -30,5 +30,9 @@ pages are cited, not reproduced.
 | I | Error types and matching countermeasures | See `../people/sources.md` (HSE "Human Failure Types") |
 | J | Cash-releasing vs non-cash-releasing benefits | HM Government, "The Government Efficiency Framework" (cash-releasing vs non-cash-releasing gains) — https://www.gov.uk/government/publications/the-government-efficiency-framework/the-government-efficiency-framework--2 (OGL v3.0) |
 
+| cards | Work questioning: eliminate, combine, rearrange, simplify (purpose, place, sequence, person, means) | ILO, *Introduction to Work Study*, 4th rev. ed., ed. G. Kanawaty (Geneva, 1992) — https://webapps.ilo.org/public/libdoc/ilo/1992/92B09_329_engl.pdf |
+| cards | Voice of the customer, critical-to-quality trees, SIPOC, measurement system analysis | ASQ Six Sigma Green Belt Body of Knowledge (2022) — https://www.asq.org/cert/resource/pdf/certification/2022-SSGB-BoK.pdf |
+| cards | Poka-yoke; FMEA definitions | ASQ Quality Glossary — https://asq.org/quality-resources/quality-glossary |
+
 Kepner-Tregoe and KT are trademarks of Kepner-Tregoe, Inc.; the method is
 referenced by name only (Kepner & Tregoe, *The Rational Manager*, 1965).

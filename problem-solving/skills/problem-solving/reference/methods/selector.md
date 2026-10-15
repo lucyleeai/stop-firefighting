@@ -23,7 +23,7 @@ Sources for each table are in `sources.md` in this folder.
 | The user describes… | Shape | Start with | Status |
 |---|---|---|---|
 | Something went wrong once (an incident, a complaint) | One-off event | Learning review of that event — not an improvement project | guided (`reference/people/guide.md` if a person's action is central) |
-| The same kind of error keeps happening | Recurring defect | Collect occurrences (mistake log), then causes → evidence ledger | guided |
+| The same kind of error keeps happening | Recurring defect | Collect occurrences (mistake log), then causes → cause ledger (`cards/cause-ledger.md`) | guided |
 | It takes too long, too many steps, bounces around | Flow problem | Process walk: waiting vs work, handoffs, motion | run (`flow_metrics.py`) |
 | A target with nothing "broken" ("save $2M", "cut lead time 20%") | Gap to a target | Cascade the target with a Pareto to the biggest slice (`rules/problem-framing.md`) | guided |
 | Choosing between options | Decision | Criteria-based comparison with sensitivity (G below) | guided |
@@ -148,6 +148,8 @@ Script: `stats_tools.py size mean --sd --margin` · `size proportion --p --margi
 
 ## H. How to make it stay fixed
 
+Card: `cards/control-plan.md` (control table, reactions, handover). Before going live: `cards/trial-and-risk.md`.
+
 Pick the control by how bad the failure is and how easy it is to detect:
 - **Make the error impossible or obvious** (mistake-proofing) when the failure is serious or hard to detect later.
 - **Monitor with a chart** when the process drifts slowly and is measured regularly.
@@ -166,6 +168,8 @@ rule; knowledge-based → support for unusual situations; deliberate deviations
 → fix why the rule is bypassed).
 
 ## J. Counting the benefit
+
+Card: `cards/benefit-baseline.md` — record the starting point before the change.
 
 Separate: cash out of the P&L vs cost avoided; one-time vs every unit from now
 on; labour hours freed vs headcount actually reduced. Freed hours are not cash
