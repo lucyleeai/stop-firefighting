@@ -15,6 +15,9 @@ reports comes from here, never from the model's own arithmetic.
             --rules picks any of Nelson rules 1-8 (default 1,2)
   capability  process capability against a requirement (refuses an unstable process)
   regress   correlation (Pearson with interval, Spearman) and a least-squares line
+  plot      histogram, box plot (by group) or scatter plot, written as SVG
+  normality D'Agostino-Pearson test (use with a plot, before choosing a t-test)
+  matrix    weighted decision matrix, with a check whether the winner survives weight changes
   agree     do raters agree? Cohen's / Fleiss' kappa, % agreement, and accuracy vs a reference rater
   grr       gauge study for measured values (repeatability, reproducibility, % of study variation)
   doe       two-level full factorial: design a randomised run sheet, or analyse the results
@@ -480,6 +483,8 @@ def run_rules(values, centre, sigma, rules):
 def chart(kind, rows, rules=(1, 2)):
     if not rows:
         fail("no data rows")
+    if any((rw.get("phase") or "").strip() for rw in rows):
+        return chart_phased(kind, rows, rules)
     labels = [rw.get("label") or str(i + 1) for i, rw in enumerate(rows)]
     extra = {}
     if kind == "imr":
@@ -629,6 +634,147 @@ def regress(xs, ys):
     if n < 10:
         out.setdefault("warning", f"Only {n} pairs: the line is rough.")
     return out
+
+
+# ---------- normality (D'Agostino-Pearson) ----------
+
+def normality(values):
+    x = finite(values, "value")
+    n = len(x)
+    need(n, 20, "normality test (fewer than 20 values: plot instead)")
+    m = statistics.mean(x)
+    m2 = sum((v - m) ** 2 for v in x) / n
+    if m2 == 0:
+        fail("all values are equal")
+    m3 = sum((v - m) ** 3 for v in x) / n
+    m4 = sum((v - m) ** 4 for v in x) / n
+    g1, b2 = m3 / m2 ** 1.5, m4 / m2 ** 2
+    y = g1 * math.sqrt((n + 1) * (n + 3) / (6.0 * (n - 2)))
+    beta2 = 3.0 * (n * n + 27 * n - 70) * (n + 1) * (n + 3) / ((n - 2.0) * (n + 5) * (n + 7) * (n + 9))
+    W2 = -1 + math.sqrt(2 * (beta2 - 1))
+    delta = 1 / math.sqrt(0.5 * math.log(W2))
+    alpha = math.sqrt(2.0 / (W2 - 1))
+    y = y if y != 0 else 1
+    zs = delta * math.log(y / alpha + math.sqrt((y / alpha) ** 2 + 1))
+    E = 3.0 * (n - 1) / (n + 1)
+    varb2 = 24.0 * n * (n - 2) * (n - 3) / ((n + 1) ** 2 * (n + 3) * (n + 5))
+    xk = (b2 - E) / math.sqrt(varb2)
+    sb1 = 6.0 * (n * n - 5 * n + 2) / ((n + 7) * (n + 9)) * math.sqrt(6.0 * (n + 3) * (n + 5) / (n * (n - 2) * (n - 3)))
+    A = 6.0 + 8.0 / sb1 * (2.0 / sb1 + math.sqrt(1 + 4.0 / sb1 ** 2))
+    t1 = 1 - 2 / (9.0 * A)
+    den = 1 + xk * math.sqrt(2 / (A - 4.0))
+    t2 = math.copysign(abs((1 - 2.0 / A) / den) ** (1 / 3.0), den) if den != 0 else float("nan")
+    zk = (t1 - t2) / math.sqrt(2 / (9.0 * A))
+    k2 = zs * zs + zk * zk
+    p = chi2_sf(k2, 2)
+    return {"status": "ok", "n": n, "skewness": r(g1), "excess_kurtosis": r(b2 - 3), "K2": r(k2), "p": r(p),
+            "basis": "D'Agostino-Pearson test on skewness and kurtosis.",
+            "plain": ("The data look clearly non-normal: use the rank-based comparison or a transformation."
+                      if p < 0.05 else "No clear departure from normal shape — but always look at the plot; "
+                      "a test cannot show a normal shape, only fail to find a departure."),
+            "warning": "Large samples flag tiny, harmless departures; small samples miss big ones. Plot first."}
+
+
+# ---------- decision matrix with weight sensitivity ----------
+
+def decision_matrix(scores, weights):
+    """scores: {option: {criterion: score}}; weights: {criterion: weight > 0}."""
+    opts = list(scores)
+    if len(opts) < 2:
+        fail("need at least 2 options")
+    crit = list(weights)
+    if not crit or any(w <= 0 for w in weights.values()):
+        fail("every criterion needs a positive weight")
+    for o in opts:
+        miss = [c for c in crit if c not in scores[o]]
+        if miss:
+            fail(f"option {o} has no score for: {', '.join(miss)}")
+    def totals(w):
+        return {o: sum(w[c] * scores[o][c] for c in crit) / sum(w.values()) for o in opts}
+    base = totals(weights)
+    rank = sorted(opts, key=lambda o: -base[o])
+    flips = []
+    for c in crit:
+        for f in (0.5, 1.5):
+            w = dict(weights); w[c] = weights[c] * f
+            t = totals(w)
+            top = max(opts, key=lambda o: t[o])
+            if top != rank[0]:
+                flips.append({"criterion": c, "weight_x": f, "new_winner": top})
+    tie = len(rank) > 1 and abs(base[rank[0]] - base[rank[1]]) < 1e-9
+    return {"status": "ok", "weighted_score": {o: r(base[o]) for o in rank}, "ranking": rank,
+            "winner_changes_when": flips,
+            "plain": ("Tie at the top: the scores do not decide this." if tie else
+                      f"{rank[0]} comes first" + (" and stays first when any one weight is halved or raised by half."
+                                                 if not flips else ", but the winner changes when some weights move — "
+                                                 "the choice depends on those weights, so agree them first.")),
+            "basis": "Weighted average of the scores; sensitivity: each weight halved and raised by 50%, one at a time.",
+            "note": "Scores are judgements: write next to each one the evidence it rests on."}
+
+
+# ---------- plots (SVG) ----------
+
+def _svg_frame(title, w=700, h=360):
+    return [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" font-family="sans-serif" font-size="11">',
+            '<rect width="100%" height="100%" fill="white"/>',
+            f'<text x="50" y="22" font-size="14">{html.escape(title)}</text>']
+
+
+def plot(kind, rows, x=None, y=None, group=None, title="Plot"):
+    w, h, L, R, T, B = 700, 360, 60, 20, 40, 50
+    pw, ph = w - L - R, h - T - B
+    parts = _svg_frame(title, w, h)
+    if kind == "hist":
+        v = finite([rw.get(x) for rw in rows if rw.get(x, "") != ""], x)
+        need(len(v), 10, "histogram (fewer than 10 values: list them instead)")
+        lo, hi = min(v), max(v)
+        if lo == hi:
+            fail("all values are equal")
+        k = max(5, min(30, int(math.ceil(math.log2(len(v)) + 1))))
+        width = (hi - lo) / k
+        counts = [0] * k
+        for t in v:
+            counts[min(k - 1, int((t - lo) / width))] += 1
+        mx = max(counts)
+        for i, c in enumerate(counts):
+            bh = ph * c / mx
+            parts.append(f'<rect x="{L + i * pw / k:.1f}" y="{T + ph - bh:.1f}" width="{pw / k - 1:.1f}" height="{bh:.1f}" fill="#1f6feb"/>')
+        parts.append(f'<text x="{L}" y="{h - 15}">{r(lo, 3)}</text><text x="{w - R - 40}" y="{h - 15}">{r(hi, 3)}</text>')
+        info = {"bins": k, "counts": counts, "bin_width": r(width)}
+    elif kind == "box":
+        groups = {}
+        for rw in rows:
+            if rw.get(y, "") != "":
+                groups.setdefault(rw.get(group, "") if group else "all", []).append(finite([rw[y]], y)[0])
+        if not groups or any(len(g_) < 5 for g_ in groups.values()):
+            fail("box plot needs at least 5 values per group")
+        allv = [t for g_ in groups.values() for t in g_]
+        lo, hi = min(allv), max(allv)
+        sc = lambda t: T + ph - (t - lo) / ((hi - lo) or 1) * ph
+        info = {}
+        for i, (g_, v) in enumerate(groups.items()):
+            q = statistics.quantiles(v, n=4, method="inclusive")
+            cx = L + (i + 0.5) * pw / len(groups)
+            parts.append(f'<line x1="{cx:.1f}" x2="{cx:.1f}" y1="{sc(max(v)):.1f}" y2="{sc(min(v)):.1f}" stroke="#555"/>')
+            parts.append(f'<rect x="{cx - 20:.1f}" y="{sc(q[2]):.1f}" width="40" height="{sc(q[0]) - sc(q[2]):.1f}" fill="#cfe2ff" stroke="#1f6feb"/>')
+            parts.append(f'<line x1="{cx - 20:.1f}" x2="{cx + 20:.1f}" y1="{sc(q[1]):.1f}" y2="{sc(q[1]):.1f}" stroke="#d1242f" stroke-width="2"/>')
+            parts.append(f'<text x="{cx - 20:.1f}" y="{h - 15}">{html.escape(str(g_))[:12]}</text>')
+            info[g_] = {"n": len(v), "q1": r(q[0]), "median": r(q[1]), "q3": r(q[2]), "min": r(min(v)), "max": r(max(v))}
+    elif kind == "scatter":
+        pts = [(finite([rw.get(x)], x)[0], finite([rw.get(y)], y)[0]) for rw in rows
+               if rw.get(x, "") != "" and rw.get(y, "") != ""]
+        need(len(pts), 5, "scatter plot")
+        xs, ys = [a for a, _ in pts], [b for _, b in pts]
+        sx = lambda t: L + (t - min(xs)) / ((max(xs) - min(xs)) or 1) * pw
+        sy = lambda t: T + ph - (t - min(ys)) / ((max(ys) - min(ys)) or 1) * ph
+        for a, b in pts:
+            parts.append(f'<circle cx="{sx(a):.1f}" cy="{sy(b):.1f}" r="3.5" fill="#1f6feb" opacity="0.7"/>')
+        parts.append(f'<text x="{w / 2:.0f}" y="{h - 10}">{html.escape(x)}</text><text x="8" y="{T + ph / 2:.0f}">{html.escape(y)}</text>')
+        info = {"n": len(pts)}
+    else:
+        fail("plot kind must be hist, box or scatter")
+    parts.append("</svg>")
+    return {"status": "ok", "plot": kind, **({"summary": info} if info else {})}, "\n".join(parts)
 
 
 # ---------- agreement between raters (attribute measurement check) ----------
@@ -829,6 +975,44 @@ def doe_analyze(rows, factors, response):
     return out
 
 
+def chart_phased(kind, rows, rules):
+    """Separate limits per phase (e.g. before / trial / after); phases are contiguous runs of the phase column."""
+    segs = []
+    for i, rw in enumerate(rows):
+        ph_ = (rw.get("phase") or "").strip()
+        if not ph_:
+            fail(f"row {i + 2}: phase is blank — give every row a phase, or none")
+        if not segs or segs[-1][0] != ph_:
+            segs.append((ph_, []))
+        segs[-1][1].append({k: v for k, v in rw.items() if k != "phase"})
+    if len(segs) < 2:
+        fail("only one phase: drop the phase column")
+    names = [n for n, _ in segs]
+    if len(set(names)) != len(names):
+        fail("each phase must be one block of consecutive rows")
+    P, PTS, CL, UCL, LCL, LAB = {}, [], [], [], [], []
+    for n, seg in segs:
+        o, pts, cl, ucl, lcl, lab = chart(kind, seg, rules)
+        P[n] = {k: o[k] for k in ("points", "limits", "signals", "plain") if k in o}
+        PTS += pts; CL += cl; UCL += ucl; LCL += lcl; LAB += [f"{n}:{l_}" for l_ in lab]
+    shifts = []
+    for (a, sa), (b, sb) in zip(segs, segs[1:]):
+        va = [float(rw.get("value") if kind == "imr" else float(rw["count"]) / float(rw["n"])) for rw in sa]
+        vb = [float(rw.get("value") if kind == "imr" else float(rw["count"]) / float(rw["n"])) for rw in sb]
+        mw = mann_whitney(va, vb)
+        shifts.append({"from": a, "to": b, "median_from": r(statistics.median(va)), "median_to": r(statistics.median(vb)),
+                       "p_two_sided": mw["p_two_sided"]})
+    out = {"status": "ok", "chart": kind, "phased": True, "phases": P, "level_change": shifts,
+           "basis": "Limits computed separately inside each phase; level change between neighbouring phases by a "
+                    "rank comparison of their values.",
+           "not_a_spec": "A changed level is associated with the phase change; other changes in the same period "
+                         "(volume, staff, season) must be ruled out before calling it the effect of the change.",
+           "plain": "; ".join(f"{s_['from']} → {s_['to']}: median {s_['median_from']} → {s_['median_to']}"
+                              + (" (unlikely to be chance)" if s_["p_two_sided"] < 0.05 else " (could be chance)")
+                              for s_ in shifts)}
+    return out, PTS, CL, UCL, LCL, LAB
+
+
 def chart_svg(pts, cl, ucl, lcl, labels, title):
     w, h, pad = 700, 320, 50
     lo, hi = min(pts + lcl), max(pts + ucl)
@@ -993,6 +1177,23 @@ def selftest():
     da = doe_analyze(rows_d, ["A", "B"], "y")
     assert close(da["effects"]["A"], 6) and close(da["effects"]["B"], -4) and close(da["effects"]["A:B"], 3), da
     assert set(da["active"]) == {"A", "B", "A:B"}, da
+    # phased chart: level shift between phases is detected; limits per phase
+    rowsp = [{"phase": "before", "value": v} for v in [10, 11, 10, 12, 11, 10, 11, 12, 10, 11]] + \
+            [{"phase": "after", "value": v} for v in [6, 7, 6, 5, 7, 6, 6, 7, 5, 6]]
+    ph = chart("imr", rowsp)[0]
+    assert ph["phased"] and ph["level_change"][0]["p_two_sided"] < 0.01 and set(ph["phases"]) == {"before", "after"}, ph
+    # decision matrix: clear winner stable; close call flips
+    dm = decision_matrix({"A": {"cost": 9, "speed": 9}, "B": {"cost": 2, "speed": 3}}, {"cost": 1, "speed": 1})
+    assert dm["ranking"][0] == "A" and not dm["winner_changes_when"], dm
+    dm = decision_matrix({"A": {"cost": 9, "speed": 2}, "B": {"cost": 2, "speed": 8}}, {"cost": 1, "speed": 1})
+    assert dm["winner_changes_when"], dm
+    # plots produce SVG and refuse tiny inputs
+    o_, svg = plot("hist", [{"v": str(i % 7)} for i in range(30)], x="v")
+    assert svg.startswith("<svg") and sum(o_["summary"]["counts"]) == 30
+    try:
+        plot("box", [{"y": "1"}], y="y"); raise AssertionError("tiny box accepted")
+    except InputError:
+        pass
     print("selftest ok")
 
 
@@ -1022,6 +1223,14 @@ def main():
     cp_.add_argument("csv"); cp_.add_argument("--lsl", type=float); cp_.add_argument("--usl", type=float)
     rg_ = sub.add_parser("regress", help="CSV with two numeric columns; --x COL --y COL")
     rg_.add_argument("csv"); rg_.add_argument("--x", required=True); rg_.add_argument("--y", required=True)
+    pl_ = sub.add_parser("plot", help="hist --x COL · box --y COL [--group COL] · scatter --x COL --y COL; --svg FILE")
+    pl_.add_argument("kind", choices=["hist", "box", "scatter"]); pl_.add_argument("csv")
+    pl_.add_argument("--x"); pl_.add_argument("--y"); pl_.add_argument("--group")
+    pl_.add_argument("--svg", required=True); pl_.add_argument("--title", default="Plot")
+    no_ = sub.add_parser("normality", help="CSV; --col COL (20+ values)")
+    no_.add_argument("csv"); no_.add_argument("--col", default="value")
+    mx_ = sub.add_parser("matrix", help="CSV option,criterion,score; --weights crit=w,crit=w")
+    mx_.add_argument("csv"); mx_.add_argument("--weights", required=True)
     ag_ = sub.add_parser("agree", help="CSV item,rater,rating (one row per rating); --standard NAME marks the reference rater")
     ag_.add_argument("csv"); ag_.add_argument("--standard")
     gr_ = sub.add_parser("grr", help="CSV part,operator,value with 2+ repeats per cell; --tol optional")
@@ -1110,6 +1319,25 @@ def main():
                 with open(x.svg, "w", encoding="utf-8") as f:
                     f.write(chart_svg(pts, cl, ucl, lcl, labels, x.title))
                 res["svg"] = x.svg
+        elif x.cmd == "plot":
+            need_cols = {"hist": ["x"], "box": ["y"], "scatter": ["x", "y"]}[x.kind]
+            if any(getattr(x, c) is None for c in need_cols):
+                fail(f"plot {x.kind} needs --" + " --".join(need_cols))
+            res, svg = plot(x.kind, read_csv(x.csv), x.x, x.y, x.group, x.title)
+            with open(x.svg, "w", encoding="utf-8") as f:
+                f.write(svg)
+            res["svg"] = x.svg
+        elif x.cmd == "normality":
+            res = normality([rw.get(x.col) for rw in read_csv(x.csv) if rw.get(x.col, "") != ""])
+        elif x.cmd == "matrix":
+            try:
+                wts = {k.strip(): float(v) for k, v in (kv.split("=") for kv in x.weights.split(","))}
+            except ValueError:
+                fail("--weights like cost=3,speed=1")
+            sc_ = {}
+            for rw in read_csv(x.csv):
+                sc_.setdefault(rw.get("option", ""), {})[rw.get("criterion", "")] = finite([rw.get("score")], "score")[0]
+            res = decision_matrix(sc_, wts)
         elif x.cmd == "agree":
             table, std = {}, {}
             for rw in read_csv(x.csv):

@@ -60,13 +60,32 @@ def path_metrics(rows, unit=None):
         "Sum of straight segments between the recorded points. Equals the real walked "
         "distance only if every turn was recorded; otherwise it is a lower bound.")}
     total = 0.0
+
+    def segs(pts):
+        return [(pts[i][:2], pts[i + 1][:2]) for i in range(len(pts) - 1)]
+
+    def cross(s1, s2):
+        (a, b), (c, d) = s1, s2
+        if {a, b} & {c, d}:
+            return False  # touching at a shared point is not a crossing
+        o = lambda p, q, r_: (q[0] - p[0]) * (r_[1] - p[1]) - (q[1] - p[1]) * (r_[0] - p[0])
+        d1, d2, d3, d4 = o(c, d, a), o(c, d, b), o(a, b, c), o(a, b, d)
+        return (d1 > 0) != (d2 > 0) and (d3 > 0) != (d4 > 0) and 0 not in (d1, d2, d3, d4)
+
+    all_segs = {t: segs(p) for t, p in trips.items()}
     for trip, pts in trips.items():
         along = sum(math.dist(a[:2], b[:2]) for a, b in zip(pts, pts[1:]))
         straight = math.dist(pts[0][:2], pts[-1][:2]) if len(pts) > 1 else 0.0
         total += along
+        sg = all_segs[trip]
+        within = sum(1 for i in range(len(sg)) for j in range(i + 2, len(sg)) if cross(sg[i], sg[j]))
         out["trips"].append({"trip": trip, "points": len(pts), "distance_along_points": round(along, 3),
-                             "start_to_end_straight_line": round(straight, 3)})
+                             "start_to_end_straight_line": round(straight, 3), "self_crossings": within})
     out["total_distance_along_points"] = round(total, 3)
+    names = list(all_segs)
+    out["crossings_between_trips"] = sum(1 for i in range(len(names)) for j in range(i + 1, len(names))
+                                         for a in all_segs[names[i]] for b in all_segs[names[j]] if cross(a, b))
+    out["crossings_note"] = "Proper crossings of straight segments; paths that only touch at a point are not counted."
     if unit is None:
         # ponytail: no scale means no real-world distance; we still return geometry units
         out["warning"] = "No unit/scale given: numbers are drawing units, NOT metres or feet. Do not report them as distance walked."
@@ -114,7 +133,7 @@ def parse_time(s, where):
         fail(f"{where}: cannot read time '{s}' (use ISO format, e.g. 2026-09-24 09:30)")
 
 
-def timeline_metrics(rows, done_states=DONE_STATES):
+def timeline_metrics(rows, done_states=DONE_STATES, work_states=None):
     cases = OrderedDict()
     for i, r in enumerate(rows):
         case, state = (r.get("case") or "").strip(), (r.get("state") or "").strip().lower()
@@ -144,8 +163,17 @@ def timeline_metrics(rows, done_states=DONE_STATES):
             item["warning"] = "Only start and end are known: this is lead time, not processing time."
         if has_actor:
             item["handoffs"] = handoff_metrics([a for _, _, a in evs])
+        if work_states and complete and item["elapsed"] > 0 and not set(by_state) <= UNSPLIT:
+            item["work_share_pct"] = round(100 * sum(v for k, v in by_state.items() if k in work_states) / item["elapsed"], 1)
         out["cases"].append(item)
     out["summary"] = summarize(out["cases"])
+    if work_states:
+        shares = [c["work_share_pct"] for c in out["cases"] if "work_share_pct" in c]
+        out["summary"]["work_share_of_lead_time_pct"] = (
+            {"n": len(shares), "median": round(statistics.median(shares), 1), "min": min(shares), "max": max(shares),
+             "work_states": sorted(work_states),
+             "note": "Time in the states you marked as work, divided by lead time (completed cases with a split). "
+                     "State time is not hours anyone actually worked."} if shares else {"n": 0})
     if has_actor:
         out["handoff_summary"] = handoff_summary(out["cases"])
     for c in out["cases"]:
@@ -344,6 +372,15 @@ def selftest():
     mm = handoff_mermaid({"edges": [{"from": "A B", "to": "A_B", "count": 1}]})
     assert 'n1["A B"]' in mm and 'n2["A_B"]' in mm, mm
     assert "&lt;script&gt;" in path_svg([{"x": "0", "y": "0", "label": "<script>"}, {"x": "3", "y": "4"}], "t", True)
+    # crossings: an X inside one trip, and two trips crossing once
+    cx = path_metrics([{"trip": "a", "x": 0, "y": 0}, {"trip": "a", "x": 2, "y": 2}, {"trip": "a", "x": 2, "y": 0},
+                       {"trip": "a", "x": 0, "y": 2}, {"trip": "b", "x": 1, "y": -1}, {"trip": "b", "x": 1, "y": 3}], unit="m")
+    assert cx["trips"][0]["self_crossings"] == 1 and cx["crossings_between_trips"] == 2, cx
+    # work share: 30 min work out of 120 min lead time
+    ws = timeline_metrics([{"case": "A", "time": "2026-09-24T09:00", "state": "queue"},
+                           {"case": "A", "time": "2026-09-24T10:30", "state": "work"},
+                           {"case": "A", "time": "2026-09-24T11:00", "state": "done"}], work_states={"work"})
+    assert ws["cases"][0]["work_share_pct"] == 25.0, ws["cases"][0]
     print("selftest ok")
 
 
@@ -362,6 +399,7 @@ def main():
                    help="one row per case (id, then timestamps in order); name the states between consecutive "
                         "timestamps, e.g. --wide queue,work")
     t.add_argument("--done-states", help="comma-separated states that mean the case is finished")
+    t.add_argument("--work-states", help="comma-separated states that count as work (for work share of lead time)")
     sub.add_parser("selftest")
     a = ap.parse_args()
     if a.cmd == "selftest":
@@ -378,7 +416,8 @@ def main():
             done = DONE_STATES if not a.done_states else {s.strip().lower() for s in a.done_states.split(",")}
             if a.wide:
                 rows = wide_to_events(rows, [s.strip() for s in a.wide.split(",")])
-            res = timeline_metrics(rows, done | {"done"})
+            work = {s.strip().lower() for s in a.work_states.split(",")} if a.work_states else None
+            res = timeline_metrics(rows, done | {"done"}, work)
             if a.mermaid and "handoff_summary" in res:
                 with open(a.mermaid, "w", encoding="utf-8") as f:
                     f.write(handoff_mermaid(res["handoff_summary"]) + "\n")

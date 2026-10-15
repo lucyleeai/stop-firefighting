@@ -8,7 +8,9 @@
 ## The table
 | Candidate cause | Place it could change | Evidence for | Evidence against | Check that would tell it apart | Status |
 |---|---|---|---|---|---|
-Status: **open** → **supported** (evidence goes with it) → **confirmed** (a trial or comparison ruled out other explanations) — or **ruled out**. Keep the *fix* status separately (planned / in place / checked / held): a confirmed cause does not mean the fix works, and a fix that works does not prove the cause.
+Status: **open** → **supported** (evidence goes with it) → **confirmed** (a trial or comparison ruled out other explanations) → **controlled** (a control from `control-plan.md` is in place for it) — or **ruled out**; a cause that comes back is **reopened**, with the new occurrence attached.
+
+**How big is it?** For a supported cause, state its size on the result with a range, from the scripts: the difference between groups (`ranks`, `prop`, `ttest`), or how much the result moves per unit of the cause (`regress`). Say "goes together with", not "causes", until a trial confirms it. Keep the *fix* status separately (planned / in place / checked / held): a confirmed cause does not mean the fix works, and a fix that works does not prove the cause.
 
 ## Finding candidates
 - **Fishbone**: list possible causes under the work method, materials and information, tools and systems, environment, measurement, and people's knowledge — to make sure nothing obvious is missed. It produces candidates, not causes.

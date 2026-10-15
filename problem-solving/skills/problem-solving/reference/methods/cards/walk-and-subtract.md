@@ -9,7 +9,9 @@
 Follow the last real item from start to finish, from records or with the people who did it:
 what was asked → what was passed on, to whom, how (form, message, file, system) → what the next person actually had → what they did → where it waited → how it was checked → what came out.
 - Use the real case, not "how it usually works". Where you cannot see a step, mark it unknown.
-- Timestamps, if any: compute waits with `scripts/flow_metrics.py` (`../../flow/guide.md`).
+- Timestamps, if any: compute waits with `scripts/flow_metrics.py` (`../../flow/guide.md`); with `--work-states` it also reports what share of the lead time is actual work.
+- Physical routes: `flow_metrics.py path` gives distances and how often paths cross.
+- **Chains of suppliers or teams:** walk each tier separately — what each one receives, decides and records — and mark where the evidence for a tier is only another tier's account of it.
 
 ## Four questions for every step
 1. **Is it needed?** What would go wrong without it? Who uses its output?

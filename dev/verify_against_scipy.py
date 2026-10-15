@@ -196,6 +196,17 @@ for _ in range(60):
         if reps > 1:
             same(ours["significance"][t]["p"], fit.pvalues[t], 1e-3, "DOE effect p")
 
+# normality (D'Agostino-Pearson) against scipy.stats.normaltest
+for _ in range(300):
+    n = rng.randint(20, 300)
+    kind = rng.choice(["norm", "lognorm", "unif"])
+    xs = [rng.gauss(0, 1) if kind == "norm" else rng.lognormvariate(0, 0.7) if kind == "lognorm" else rng.uniform(0, 1)
+          for _ in range(n)]
+    ours = st.normality(xs)
+    ref = stats.normaltest(xs)
+    same(ours["K2"], ref.statistic, 1e-3 * max(1, ref.statistic), "K2")
+    same(ours["p"], ref.pvalue, 1e-4, "normality p")
+
 # control-chart constants against first principles
 d2 = 2 / math.sqrt(math.pi)  # expected range of 2 normal values in sd units = 1.128
 same(1.128, d2, 5e-4, "d2 constant")

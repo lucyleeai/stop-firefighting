@@ -44,6 +44,13 @@ just fix it and check.
 | **Records** — timestamps, measurements, logs for dozens to hundreds of items | Measure → graph → compare (C, D below); stratify by candidate causes | Which candidates are **associated** with the problem, and how strongly. A cause is established only by a design that rules out other explanations (a controlled trial, a before/after with a comparison group, or a confirmed mechanism) | run (flow, stats) |
 | **Large datasets** — thousands of rows, many variables | Data-analytic screening (regression trees, random forests) to shortlist variables, then confirm with a designed check | Candidate drivers to confirm | elsewhere (a data analyst) |
 
+**Second question: how much detail is known about how it happens?** With little
+data but a clear picture of the mechanism (a known sequence of steps, a
+documented incident), go deeper than a brainstorm: a fault tree (what has to
+fail together for this to happen) or a step-by-step event chain. With little
+detail, start broad (fishbone), then narrow on one real occurrence (5 Whys).
+Little data and little detail: first get one occurrence described in full.
+
 Moving right in this table is usually cheaper than it looks: a two-week tally
 turns stories into counts. Say that when the user has only stories.
 
@@ -52,7 +59,7 @@ turns stories into counts. Say that when the user has only stories.
 Stop at the first rung that answers the question.
 
 1. **Practical** — use what already exists: system exports, logs, prior incident notes. Check data quality before anything else (typos, wrong area, duplicate records).
-2. **Graphical** — plot it: time series, histogram, box plot by group, Pareto, scatter. Often this shows where to look (a shift after a change, two groups that differ) — an association to check, not proof of cause: other things may have changed at the same time (volume, mix, season, staff).
+2. **Graphical** — plot it: time series (`chart`), histogram, box plot by group, scatter (`stats_tools.py plot hist|box|scatter … --svg file`), Pareto. Often this shows where to look (a shift after a change, two groups that differ) — an association to check, not proof of cause: other things may have changed at the same time (volume, mix, season, staff).
 3. **Analytical** — a statistical test when the picture is ambiguous and the decision matters (D below).
 4. **Multivariable** — only when several causes interact: multiple regression (inputs roughly independent), a designed experiment (you can set the inputs), multivariate analysis (inputs move together).
 
@@ -82,7 +89,7 @@ target; (3) only then the data's shape.
 |  | Three or more groups | One-way ANOVA — `anova` | run |
 |  | Is the spread different? | F-test / Levene | later |
 |  | Does Y move with X? | Correlation and a straight line — `regress --x COL --y COL` (association only) | run |
-|  | Is it roughly normal? | Plot first (histogram) | guided |
+|  | Is it roughly normal? | Plot first (`plot hist`), then `normality --col COL` (20+ values) | run |
 | Counted (yes/no, defective, late) | Two proportions (pilot vs before, team A vs B) | **Two-proportion test** + Fisher exact — `prop --x1 --n1 --x2 --n2` | run |
 |  | Proportion vs a target | One-proportion test — `prop --x1 --n1 --p0` | run |
 |  | Categories vs categories (error type by shift) | Chi-square test of association — `chisq` | run |
@@ -100,6 +107,10 @@ normal for it.
 
 Script: `stats_tools.py chart imr|p|u data.csv --svg chart.svg` (rules 1–2 by default; `--rules 1,2,3,4,5,6,7,8` adds the
 rules for small sustained shifts — more rules, more false alarms).
+
+**Before / during / after a change:** add a `phase` column (e.g. before, trial,
+after); `chart` then sets limits inside each phase and tests whether the level
+moved between phases.
 
 **Stable, but good enough?** Once a chart shows no signal, compare the process
 with the requirement: `stats_tools.py capability data.csv --lsl … --usl …`
@@ -154,7 +165,7 @@ Script: `stats_tools.py size mean --sd --margin` · `size proportion --p --margi
 | Several factors may matter; you can set them | Designed experiment: screening (fractional factorial) first, then full factorial on the few that matter — up to 5 factors: `doe design` / `doe analyze` (`cards/experiment.md`); more: a specialist | run |
 | Changing one factor at a time | Avoid when factors interact — it misses interactions and gives no prediction | — |
 | "It worked, but only at one exact setting" | Look for a robust setting (performance *and* its variation), not a spike | elsewhere |
-| Choosing among options with several criteria | Decision matrix against a baseline; show the scoring evidence and whether the winner changes when weights change | guided |
+| Choosing among options with several criteria | Decision matrix against a baseline; show the scoring evidence and whether the winner changes when weights change — `matrix opts.csv --weights a=3,b=1` (shows whether the winner survives weight changes) | run |
 
 ## H. How to make it stay fixed
 
