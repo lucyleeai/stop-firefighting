@@ -722,6 +722,17 @@ def _svg_frame(title, w=700, h=360):
             f'<text x="50" y="22" font-size="14">{html.escape(title)}</text>']
 
 
+def _axis(lo, hi, pos, at, vertical=True, n=5):
+    """Tick labels so a reader can read values off the picture."""
+    out = []
+    for i in range(n):
+        v = lo + (hi - lo) * i / (n - 1)
+        p = pos(v)
+        out.append(f'<text x="{at - 4}" y="{p + 4:.1f}" text-anchor="end" fill="#555">{r(v, 3)}</text>' if vertical
+                   else f'<text x="{p:.1f}" y="{at}" text-anchor="middle" fill="#555">{r(v, 3)}</text>')
+    return out
+
+
 def plot(kind, rows, x=None, y=None, group=None, title="Plot"):
     w, h, L, R, T, B = 700, 360, 60, 20, 40, 50
     pw, ph = w - L - R, h - T - B
@@ -738,6 +749,8 @@ def plot(kind, rows, x=None, y=None, group=None, title="Plot"):
         for t in v:
             counts[min(k - 1, int((t - lo) / width))] += 1
         mx = max(counts)
+        for c in range(0, mx + 1, max(1, math.ceil(mx / 4))):  # counts are whole numbers
+            parts.append(f'<text x="{L - 4}" y="{T + ph - ph * c / mx + 4:.1f}" text-anchor="end" fill="#555">{c}</text>')
         for i, c in enumerate(counts):
             bh = ph * c / mx
             parts.append(f'<rect x="{L + i * pw / k:.1f}" y="{T + ph - bh:.1f}" width="{pw / k - 1:.1f}" height="{bh:.1f}" fill="#1f6feb"/>')
@@ -754,6 +767,9 @@ def plot(kind, rows, x=None, y=None, group=None, title="Plot"):
         lo, hi = min(allv), max(allv)
         sc = lambda t: T + ph - (t - lo) / ((hi - lo) or 1) * ph
         info = {}
+        parts += _axis(lo, hi, sc, L)
+        if y:
+            parts.append(f'<text x="8" y="{T - 10}">{html.escape(y)}</text>')
         for i, (g_, v) in enumerate(groups.items()):
             q = statistics.quantiles(v, n=4, method="inclusive")
             cx = L + (i + 0.5) * pw / len(groups)
@@ -771,7 +787,8 @@ def plot(kind, rows, x=None, y=None, group=None, title="Plot"):
         sy = lambda t: T + ph - (t - min(ys)) / ((max(ys) - min(ys)) or 1) * ph
         for a, b in pts:
             parts.append(f'<circle cx="{sx(a):.1f}" cy="{sy(b):.1f}" r="3.5" fill="#1f6feb" opacity="0.7"/>')
-        parts.append(f'<text x="{w / 2:.0f}" y="{h - 10}">{html.escape(x)}</text><text x="8" y="{T + ph / 2:.0f}">{html.escape(y)}</text>')
+        parts += _axis(min(ys), max(ys), sy, L) + _axis(min(xs), max(xs), sx, T + ph + 15, vertical=False)
+        parts.append(f'<text x="{w / 2:.0f}" y="{h - 5}" text-anchor="middle">{html.escape(x)}</text><text x="8" y="{T - 10}">{html.escape(y)}</text>')
         info = {"n": len(pts)}
     else:
         fail("plot kind must be hist, box or scatter")
@@ -1016,10 +1033,10 @@ def chart_phased(kind, rows, rules):
 
 
 def chart_svg(pts, cl, ucl, lcl, labels, title):
-    w, h, pad = 700, 320, 50
+    w, h, pad = 760, 320, 50
     lo, hi = min(pts + lcl), max(pts + ucl)
     span = (hi - lo) or 1
-    X = lambda i: pad + i * (w - 2 * pad) / max(1, len(pts) - 1)
+    X = lambda i: pad + i * (w - 3 * pad) / max(1, len(pts) - 1)
     Y = lambda v: h - pad - (v - lo) * (h - 2 * pad) / span
     line = lambda vals, col, dash="": ('<polyline fill="none" stroke="%s" stroke-width="1.5" %s points="%s"/>'
                                        % (col, f'stroke-dasharray="{dash}"' if dash else "",
@@ -1028,6 +1045,9 @@ def chart_svg(pts, cl, ucl, lcl, labels, title):
              '<rect width="100%" height="100%" fill="white"/>',
              f'<text x="{pad}" y="20" font-size="13">{html.escape(title)}</text>',
              line(ucl, "#d1242f", "5,4"), line(lcl, "#d1242f", "5,4"), line(cl, "#1a7f37", "2,3"), line(pts, "#1f6feb")]
+    parts += _axis(lo, hi, Y, pad)
+    for vals, col in ((ucl, "#d1242f"), (cl, "#1a7f37"), (lcl, "#d1242f")):
+        parts.append(f'<text x="{X(len(pts) - 1) + 6:.1f}" y="{Y(vals[-1]) + 4:.1f}" fill="{col}">{r(vals[-1], 3)}</text>')
     for i, v in enumerate(pts):
         out = v > ucl[i] or v < lcl[i]
         parts.append(f'<circle cx="{X(i):.1f}" cy="{Y(v):.1f}" r="3.5" fill="{"#d1242f" if out else "#1f6feb"}">'
