@@ -29,6 +29,10 @@ deviations) and the countermeasures that fit each.
 - "It promised to do better" and "a rule was added" are not changes in place.
   A change is in place when the next run actually receives it and its output
   shows it — check that on the next real task.
+- Say how to count whether it worked: over the next N real replies or tasks
+  (N set in advance, e.g. 50 replies or two weeks), the number that went wrong
+  out of the number where it could have — compared with the same count before
+  the change. "It seems better" is not a result.
 - Another model reviewing the work is not automatically independent. The
   checker needs the original request, the actual trace and the output — not
   the previous analysis.

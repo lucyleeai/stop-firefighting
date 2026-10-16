@@ -1,18 +1,17 @@
 ---
 name: problem-solving
 description: >
-  Evidence-first help with problems that keep coming back at work: repeat
-  mistakes (by people, machines, suppliers or AI assistants), slow processes,
-  waiting and handoffs, too many approvals, late suppliers, and "did it
-  change?" questions. Finds what really happens, ties it to something that can
-  change, tries the change small and checks that it holds. Every number comes
-  from bundled scripts; never blames individuals. Use when the user says "why
-  does this keep happening", "it happened again", "third time this month", "we
-  fixed it but it came back", "always late", "keeps making mistakes", "should
-  I fire her", "too slow", "too many approvals", "is this just noise", "did
-  the change work", "root cause", "5 whys", or "为什么又", "又出错了", "反复",
-  "老是", "总是", "说了多少次还是", "这个月第三次", "头痛医头", "根因", "复盘",
-  "改了没用", "还是不行".
+  Use when a problem at work keeps coming back, or someone asks why it happened
+  again or whether a change worked: "why does this keep happening", "it
+  happened again", "third time this month", "we fixed it but it came back",
+  "always late", "keeps making mistakes", "should I fire her", "too slow",
+  "too many approvals", "is this just noise", "did the change work", "root
+  cause", "5 whys", or "为什么又", "又出错了", "反复", "老是", "总是", "说了多少次还是",
+  "这个月第三次", "头痛医头", "根因", "复盘", "改了没用", "还是不行". Covers repeat
+  mistakes by people, machines, suppliers or AI assistants, slow processes,
+  waiting and handoffs, late suppliers. Finds what really happens, ties it to
+  something that can change, tries the change small and checks that it holds;
+  every number from bundled scripts; never blames individuals.
 ---
 
 # Problem solving
@@ -59,6 +58,7 @@ your card and let the reply change accordingly.
 | One question about data ("is this just noise", "which cause first", "did it change") | Answer it with the scripts. No case record, no full method. | `reference/methods/selector.md` |
 | A symptom and no data ("it's chaos", "always late", "keeps making mistakes", "should I fire her") | The **starter kit**: likely causes that fit their case, a tailored record table, one or two reversible trials (for a single incident: an immediate safeguard), at most three questions at the end. Never questions alone. | `rules/first-reply.md`, `rules/templates.md` |
 | It came back after an earlier fix or analysis | First check whether the earlier fix was actually put in place and used, before diagnosing again. | `rules/case-record.md`, `rules/trial-log.md` |
+| A change has just started or just gone live ("we did what you said, started yesterday — solved?") | Not solved yet: give the success bar and the check date (propose defaults if they have none) and what to record until then. | `rules/trial-log.md`, `reference/methods/cards/control-plan.md` |
 | The cause is already known and the fix is clear | Make or prepare the fix, set how it will be checked, then responsibilities 5–6 below. | `rules/trial-log.md` |
 | Serious harm is happening now | Contain it first (stop, isolate, tell whoever must know), then investigate. | — |
 | Timestamps, logs, a route, step lists | Analyse the flow; **every number from the script** | `reference/flow/guide.md`, `scripts/flow_metrics.py` |
@@ -96,7 +96,8 @@ not state statistics you have not computed.
    approval, not a vague "pending".
 6. **The next occurrence, and handover** (`reference/methods/cards/control-plan.md`). Who owns it, where it lives, how
    often it is checked, what to do if it fails. If the problem comes back, the
-   case reopens.
+   case reopens. Whenever a change has just gone live, the reply names the
+   success bar and the check date — never leave either for later.
 
 ## What you deliver
 

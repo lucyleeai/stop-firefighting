@@ -286,9 +286,11 @@ def mann_whitney(a, b):
            "estimand": "whether values in A tend to be larger than in B — not a difference in means",
            "n": [n1, n2], "median": [r(statistics.median(a)), r(statistics.median(b))], "U": r(u1, 1), "z": r(z),
            "p_two_sided": r(pv), "share_pairs_a_greater": r(gt, 3), "share_pairs_tied": r(eq, 3),
+           "pairs_compared": n1 * n2,
            "interval": "not computed",
            "plain": (f"Medians {r(statistics.median(a), 3)} vs {r(statistics.median(b), 3)}. In {r(gt * 100, 1)}% of "
-                     f"A-B pairs the A value is larger ({r(eq * 100, 1)}% tied). "
+                     f"all {n1 * n2} combinations of one A value with one B value, the A value is larger "
+                     f"({r(eq * 100, 1)}% tied) — every A compared with every B, not A and B matched one-to-one. "
                      + ("A consistent difference." if pv < 0.05 else "Not a consistent difference on this data."))}
     if min(n1, n2) < 8:
         out["warning"] = "Fewer than 8 in a group: the normal approximation is rough."
