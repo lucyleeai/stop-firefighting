@@ -30,7 +30,7 @@ Tested end to end with Claude Code · Codex · Hermes.
 Use only the steps the situation needs. A single data question gets a direct answer. A problem that came back starts by verifying that the earlier fix is in place. A change that just went live gets a success bar and a check date.
 
 ```mermaid
-flowchart TD; A[Name what to fix in your words] --> B[Check the facts and the measure] --> C[Trace the cause to something that can change] --> D[Run a small trial] --> E[Put the change into real work] --> F[Plan for the next occurrence and handover]
+flowchart LR; A[Name what to fix in your words] --> B[Check the facts and the measure] --> C[Trace the cause to something that can change] --> D[Run a small trial] --> E[Put the change into real work] --> F[Plan for the next occurrence and handover]
 ```
 
 As needed, the skill covers six responsibilities: name what to fix in your words; check the facts and the measure; trace the cause to something that can change; run a small trial; put the change into real work; and plan for the next occurrence and handover.
