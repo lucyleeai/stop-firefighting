@@ -8,7 +8,7 @@
       "name": "stop-firefighting",
       "displayName": "Stop Firefighting",
       "source": "./problem-solving",
-      "description": "Evidence-first problem solving adapted from Lean Six Sigma: process walks and blame-free human error reviews."
+      "description": "Evidence-first help for problems that keep coming back: use bundled scripts for every number, never blame people, and finish with a change that is checked."
     }
   ],
   "description": "Evidence-first problem-solving skills adapted from Lean Six Sigma."
