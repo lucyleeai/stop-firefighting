@@ -99,6 +99,8 @@ After installing, describe the problem in your own words to your agent:
 - "Invoices take forever to get paid."
 - "我们的审批太慢了"
 
+With a smaller model, name the skill: "Use problem-solving to look at why our orders ship late." Smaller models do not always open it by themselves. When they don't, they work numbers out on their own and can get them wrong.
+
 The `write-sop` skill runs when you ask for it by name — for example, "write an SOP for how we handle returns."
 
 ## Why trust the numbers
@@ -116,17 +118,27 @@ The `write-sop` skill runs when you ask for it by name — for example, "write a
 
 **v0.2.0.** Issues welcome; outside pull requests not merged for now.
 
-On our own synthetic set of 57 cases, using gpt-6-sol, the share of checks passed was:
+We tested 58 synthetic cases written for this project. They covered everyday work problems such as late suppliers, slow approvals, picking errors and kitchen delays. They also included 12 blind user personas, claims of a status without evidence, and the new methods. No skill, v0.1.0 and v0.2.0 were compared on the same cases.
 
-| Version | Checks passed |
-|---|---:|
-| No skill | 78.5% |
-| v0.1.0 | 86.5% |
-| v0.2.0 (before final fixes) | 89.1% |
+The main model, gpt-6-sol, had 110 runs per version. Cases where wording matters most were run 3 times. The smaller model, gpt-6-luna, had 30 cases, 1 run each.
 
-A separate model scored the replies without knowing which version produced them. After the final fixes, only the eight cases that had regressed were rerun, going from 87/102 to 98/102 checks passed. The full 57-case set was not rerun after the final fixes. No severe failure—personal blame, a wrong number, or a false “done”—was verified in the final retest.
+A separate model (gpt-6-sol) scored each reply against written checks without knowing which version produced it. Checks on blame and false status used 3 votes. Every run was also checked 3 times for severe failures: blaming a person, a number that contradicts the case data, or a false claim that something was done or solved.
 
-With the smaller gpt-6-luna model, the skill was opened in only about half the runs, so the gain was small. With smaller models, call the skill by name. Triggers now include common English and Chinese phrases such as “it happened again,” “we fixed it but it came back,” “为什么又” and “改了没用.”
+The test agent had general working instructions on stating evidence and not inventing numbers, the same for all three versions. This may make the measured differences smaller, not larger.
+
+| Version | gpt-6-sol: checks passed | gpt-6-luna: checks passed |
+|---|---:|---:|
+| No skill | 289/364 (79.4%) | 83/109 (76.1%) |
+| v0.1.0 | 316/364 (86.8%) | 87/109 (79.8%) |
+| v0.2.0 | 325/364 (89.3%) | 95/109 (87.2%) |
+
+With gpt-6-sol, v0.2.0 gained +9.9 percentage points over no skill (95% range across cases: +5.2 to +14.9), a clear gain. Against v0.1.0, it gained +2.5 points (range −0.5 to +5.5), which is not conclusive.
+
+With gpt-6-luna, the gain over no skill was +11.0 points (range +5.0 to +17.3). Against v0.1.0, it was +7.3 points (range −0.9 to +15.5), which is not conclusive. These ranges show uncertainty in the gains; a range that crosses zero leaves open whether there was an improvement.
+
+With v0.2.0, no severe failures were verified in 110 gpt-6-sol runs. The smaller model had one severe failure: a wrong average time. In that run, it did not open the skill or run a bundled script; it worked the number out itself. It opened the skill in 13 of 30 runs with v0.2.0, compared with 7 of 30 with v0.1.0.
+
+The new hand-over case showed no improvement: no skill passed 15/15 checks, v0.1.0 passed 14/15, and v0.2.0 passed 14/15. The base model already handles it.
 
 Treat these results as indicative: the test set is our own. The skill guides and computes, but cannot by itself make an agent load it or enforce a change. It is not a substitute for professional advice on safety-critical, legal or medical decisions.
 
